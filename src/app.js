@@ -1,6 +1,11 @@
-import test from 'node:test';
-import assert from 'node:assert';
+import { crawl } from './crawler/crawler.js';
 
-test('Image-Audit test', () => {
-    assert.strictEqual(1 + 1, 2);
-});
+const startUrl = 'https://ivan-melehin.github.io/image-audit-test-site/';
+
+const pages = await crawl(startUrl);
+
+console.log('\nFound pages:');
+
+for (const page of pages) {
+    console.log(page);
+}
