@@ -1,6 +1,6 @@
 import { crawl } from './crawler/crawler.js';
 
-const startUrl = 'https://ivan-melehin.github.io/image-audit-test-site/';
+const startUrl = 'http://localhost:3000';
 
 const pages = await crawl(startUrl);
 
