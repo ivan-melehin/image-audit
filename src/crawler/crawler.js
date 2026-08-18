@@ -68,5 +68,7 @@ export async function crawl(startUrl) {
 
     await visit(startUrl);
 
-    return pages;
+console.log(`\nВсего найдено страниц: ${pages.length}`);
+
+return pages;
 }
