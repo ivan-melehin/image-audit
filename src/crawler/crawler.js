@@ -11,12 +11,10 @@ import * as cheerio from 'cheerio';
 // Экспортируем функцию crawl.
 // Благодаря export эту функцию можно использовать в других файлах,
 // например в app.js.
-//
 // startUrl — URL сайта, с которого начинается обход.
 export async function crawl(startUrl) {
 
     // Set — специальная коллекция, которая хранит только уникальные значения.
-    //
     // Здесь будем хранить URL, которые crawler уже посещал.
     // Это не позволит несколько раз заходить на одну и ту же страницу.
     const visited = new Set();
@@ -27,38 +25,31 @@ export async function crawl(startUrl) {
 
 
     // Преобразуем начальный URL в объект URL.
-    //
     // Объект URL позволяет отдельно получать протокол, домен,
     // путь и другие части адреса.
     const start = new URL(startUrl);
 
 
     // Получаем домен начального сайта.
-    //
     // Например:
     // https://example.com/articles
-    //
     // start.host будет:
     // example.com
-    //
     // Позже используем его, чтобы crawler не переходил
     // на сайты с другим доменом.
     const baseHost = start.host;
 
 
     // Внутренняя функция visit отвечает за посещение одной страницы.
-    //
     // Она объявлена внутри crawl, поэтому имеет доступ к:
     // visited
     // pages
     // baseHost
-    //
     // async позволяет использовать await внутри функции.
     async function visit(url) {
 
 
         // Проверяем, посещали ли мы этот URL раньше.
-        //
         // Если URL уже есть в Set visited,
         // повторно открывать страницу не нужно.
         if (visited.has(url)) {
@@ -67,7 +58,6 @@ export async function crawl(startUrl) {
 
 
         // Добавляем текущий URL в список посещённых.
-        //
         // После этого crawler будет знать,
         // что эту страницу уже обрабатывал.
         visited.add(url);
@@ -79,14 +69,12 @@ export async function crawl(startUrl) {
 
 
         // Начинаем блок обработки страницы.
-        //
         // Если во время запроса или обработки возникнет ошибка,
         // управление перейдёт в блок catch ниже.
         try {
 
 
             // Отправляем HTTP GET-запрос по указанному URL.
-            //
             // await означает, что мы ждём ответа сервера,
             // прежде чем продолжить выполнение.
             const response = await axios.get(url);
@@ -98,7 +86,6 @@ export async function crawl(startUrl) {
 
 
             // Передаём полученный HTML в Cheerio.
-            //
             // Переменная $ будет использоваться для поиска
             // HTML-элементов внутри страницы.
             const $ = cheerio.load(response.data);
@@ -111,21 +98,16 @@ export async function crawl(startUrl) {
 
             // Ищем все HTML-элементы <a>,
             // у которых есть атрибут href.
-            //
             // Например:
-            //
             // <a href="/about.html">О компании</a>
-            //
             // Для каждого найденного элемента выполняется
             // функция внутри each().
             $('a[href]').each((index, element) => {
 
 
                 // Получаем значение атрибута href.
-                //
                 // Например:
                 // href="/about.html"
-                //
                 // В переменную href попадёт:
                 // /about.html
                 const href = $(element).attr('href');
@@ -145,46 +127,33 @@ export async function crawl(startUrl) {
 
                     // new URL() умеет преобразовывать
                     // относительные ссылки в абсолютные.
-                    //
                     // Например:
-                    //
                     // href:
                     // /about.html
-                    //
                     // текущая страница:
                     // https://example.com/
-                    //
                     // результат:
                     // https://example.com/about.html
                     const link = new URL(href, url);
 
 
                     // Удаляем часть URL после символа #.
-                    //
                     // Например:
-                    //
                     // https://example.com/about#contacts
-                    //
                     // превращается в:
-                    //
                     // https://example.com/about
-                    //
                     // Это позволяет не считать переходы
                     // внутри одной страницы отдельными страницами.
                     link.hash = '';
 
 
                     // Проверяем домен ссылки.
-                    //
                     // Если ссылка ведёт на другой домен,
                     // crawler её игнорирует.
-                    //
                     // Например, если мы сканируем:
                     // loginom.ru
-                    //
                     // ссылка на:
                     // google.com
-                    //
                     // сюда не попадёт.
                     if (link.host !== baseHost) {
                         return;
@@ -192,11 +161,9 @@ export async function crawl(startUrl) {
 
 
                     // Проверяем протокол ссылки.
-                    //
                     // Crawler разрешает только:
                     // http:
                     // https:
-                    //
                     // Другие протоколы, например mailto: или tel:,
                     // игнорируются.
                     if (
@@ -228,10 +195,8 @@ export async function crawl(startUrl) {
 
 
                 // Запускаем функцию visit для каждой найденной ссылки.
-                //
                 // Таким образом crawler переходит на следующую страницу
                 // и начинает искать ссылки уже там.
-                //
                 // await означает, что следующая ссылка будет обработана
                 // после завершения текущей.
                 await visit(link);
@@ -255,22 +220,18 @@ export async function crawl(startUrl) {
 
 
     // Запускаем crawler с начального URL.
-    //
     // С этого места начинается весь обход сайта.
     await visit(startUrl);
 
 
     // После завершения обхода выводим количество найденных страниц.
-    //
     // pages.length возвращает количество элементов в массиве pages.
     console.log(`\nВсего найдено страниц: ${pages.length}`);
 
 
     // Возвращаем массив найденных страниц.
-    //
     // Благодаря return результат функции crawl()
     // можно получить в app.js:
-    //
     // const pages = await crawl(startUrl);
     return pages;
 }

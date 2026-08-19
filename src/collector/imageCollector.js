@@ -13,14 +13,12 @@ import * as cheerio from 'cheerio';
 // Экспортируем функцию collectImages,
 // чтобы её можно было использовать в других файлах,
 // например в app.js.
-//
 // pages — массив URL страниц,
 // которые ранее нашёл crawler.
 export async function collectImages(pages) {
 
 
     // Создаём пустой массив images.
-    //
     // Сюда будем добавлять информацию
     // обо всех найденных изображениях.
     const images = [];
@@ -28,8 +26,7 @@ export async function collectImages(pages) {
 
     // Перебираем все страницы,
     // которые передал нам crawler.
-    //
-    // pageUrl — URL одной конкретной страницы.
+    //pageUrl — URL одной конкретной страницы.
     for (const pageUrl of pages) {
 
 
@@ -39,7 +36,6 @@ export async function collectImages(pages) {
 
 
         // Начинаем блок обработки страницы.
-        //
         // Если страницу не получится загрузить,
         // программа не должна полностью остановиться.
         // В таком случае сработает блок catch ниже.
@@ -47,7 +43,6 @@ export async function collectImages(pages) {
 
 
             // Отправляем GET-запрос на страницу.
-            //
             // await означает:
             // ждём ответа сервера перед продолжением выполнения.
             const response = await axios.get(pageUrl, {
@@ -55,9 +50,7 @@ export async function collectImages(pages) {
 
                 // Устанавливаем максимальное время ожидания ответа
                 // в миллисекундах.
-                //
-                // 10000 миллисекунд = 10 секунд.
-                //
+               // 10000 миллисекунд = 10 секунд.
                 // Если сервер не ответит за это время,
                 // произойдёт ошибка.
                 timeout: 10000,
@@ -69,7 +62,6 @@ export async function collectImages(pages) {
 
                     // Представляемся браузером/инструментом
                     // с названием Image-Audit.
-                    //
                     // Некоторые серверы могут по-разному
                     // обрабатывать запросы в зависимости от User-Agent.
                     'User-Agent': 'Image-Audit/1.0'
@@ -78,9 +70,7 @@ export async function collectImages(pages) {
 
 
             // Передаём полученный HTML-код в Cheerio.
-            //
             // response.data содержит HTML-код страницы.
-            //
             // После этого переменная $
             // позволяет искать элементы внутри HTML.
             const $ = cheerio.load(response.data);
@@ -88,28 +78,21 @@ export async function collectImages(pages) {
 
             // Ищем все элементы <img> на текущей странице,
             // у которых могут находиться изображения.
-            //
             // each() запускает функцию для каждого найденного <img>.
-            //
             // index — порядковый номер элемента.
             // element — сам HTML-элемент <img>.
             $('img').each((index, element) => {
 
 
                 // Получаем значение атрибута src.
-                //
                 // Например, из:
-                //
                 // <img src="images/photo.jpg">
-                //
                 // получим:
-                //
                 // images/photo.jpg
                 const src = $(element).attr('src');
 
 
                 // Проверяем, существует ли значение src.
-                //
                 // Если src отсутствует или пустой,
                 // такое изображение мы не сможем обработать.
                 if (!src) {
@@ -117,7 +100,6 @@ export async function collectImages(pages) {
 
                     // return здесь завершает обработку
                     // текущего элемента <img>.
-                    //
                     // После этого each() переходит
                     // к следующему изображению.
                     return;
@@ -125,7 +107,6 @@ export async function collectImages(pages) {
 
 
                 // Пытаемся обработать URL изображения.
-                //
                 // Отдельный try/catch нужен потому,
                 // что значение src может оказаться некорректным URL.
                 try {
@@ -133,18 +114,13 @@ export async function collectImages(pages) {
 
                     // Преобразуем адрес изображения
                     // в абсолютный URL.
-                    //
                     // Например:
-                    //
                     // src:
                     // images/photo.jpg
-                    //
                     // pageUrl:
                     // http://localhost:3000/catalog/
-                    //
                     // результат:
                     // http://localhost:3000/catalog/images/photo.jpg
-                    //
                     // Если src уже является абсолютным URL,
                     // он будет использован как есть.
                     const imageUrl = new URL(src, pageUrl).href;
@@ -152,7 +128,6 @@ export async function collectImages(pages) {
 
                     // Добавляем найденное изображение
                     // в массив images.
-                    //
                     // Здесь создаётся объект
                     // с информацией об изображении.
                     images.push({
@@ -168,20 +143,16 @@ export async function collectImages(pages) {
 
 
                         // Получаем значение атрибута alt.
-                        //
                         // Например:
                         // <img src="photo.jpg" alt="Фотография">
-                        //
                         // В результате:
                         // alt: 'Фотография'
-                        //
                         // Если атрибут alt отсутствует,
                         // используется пустая строка.
                         alt: $(element).attr('alt') || '',
 
 
                         // Получаем значение атрибута title.
-                        //
                         // Если title отсутствует,
                         // используется пустая строка.
                         title: $(element).attr('title') || '',
@@ -189,7 +160,6 @@ export async function collectImages(pages) {
 
                         // Запоминаем способ,
                         // которым было найдено изображение.
-                        //
                         // Сейчас Collector ищет изображения
                         // через HTML-элемент <img>.
                         source: 'img'
@@ -230,10 +200,8 @@ export async function collectImages(pages) {
 
 
     // Возвращаем массив найденных изображений.
-    //
     // Благодаря return этот результат можно получить
     // в app.js:
-    //
     // const images = await collectImages(pages);
     return images;
     
