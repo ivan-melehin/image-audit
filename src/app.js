@@ -9,7 +9,16 @@ import { collectImages } from './collector/imageCollector.js';
 
 // Адрес сайта, с которого начнётся обход.
 // Именно эту страницу первой откроет crawler.
-const startUrl = 'http://localhost:3000';
+const startUrl = 'https://loginom.ru/';
+
+// https://parentslike.ru/ - сайт для тестов
+// https://loginom.ru/
+
+
+// Запоминаем время начала всего аудита.
+// Эта строка должна находиться ДО запуска crawler,
+// чтобы в итоговое время вошёл весь процесс проверки.
+const startTime = Date.now();
 
 
 // Запускаем crawler и передаём ему начальный URL.
@@ -52,3 +61,45 @@ console.log('\nFound images:');
 for (const image of images) {
     console.log(image);
 }
+
+
+// Подсчёт времени на весь аудит
+// в часах, минутах и секундах.
+const endTime = Date.now();
+
+
+// Вычисляем, сколько миллисекунд прошло
+// с момента запуска аудита.
+const elapsedTime = endTime - startTime;
+
+
+// Переводим миллисекунды в часы.
+const hours = Math.floor(elapsedTime / 3600000);
+
+
+// Получаем количество минут,
+// оставшихся после выделения полных часов.
+const minutes = Math.floor((elapsedTime % 3600000) / 60000);
+
+
+// Получаем количество секунд,
+// оставшихся после выделения полных минут.
+const seconds = Math.floor((elapsedTime % 60000) / 1000);
+
+
+// Выводим итоговый отчёт.
+console.log('\n========== Итог ==========');
+
+
+// Выводим количество найденных страниц.
+console.log(`Всего найдено страниц: ${pages.length}`);
+
+
+// Выводим количество найденных изображений.
+console.log(`Всего найдено изображений: ${images.length}`);
+
+
+// Выводим общее время работы аудита.
+console.log(
+    `Время выполнения: ${hours} ч. ${minutes} мин. ${seconds} сек.`
+);
