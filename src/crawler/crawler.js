@@ -65,7 +65,7 @@ export async function crawl(startUrl) {
 
         // Показываем в консоли страницу,
         // которую crawler сейчас обрабатывает.
-        console.log(`Crawling: ${url}`);
+        //console.log(`Crawling: ${url}`);
 
 
         // Начинаем блок обработки страницы.
@@ -226,7 +226,7 @@ export async function crawl(startUrl) {
 
     // После завершения обхода выводим количество найденных страниц.
     // pages.length возвращает количество элементов в массиве pages.
-    console.log(`\nВсего найдено страниц: ${pages.length}`);
+    // console.log(`\nВсего найдено страниц: ${pages.length}`);
 
 
     // Возвращаем массив найденных страниц.

@@ -32,7 +32,7 @@ export async function collectImages(pages) {
 
         // Показываем в консоли,
         // какую страницу сейчас обрабатывает Image Collector.
-        console.log(`Collecting images: ${pageUrl}`);
+        //console.log(`Collecting images: ${pageUrl}`);
 
 
         // Начинаем блок обработки страницы.
@@ -196,7 +196,7 @@ export async function collectImages(pages) {
     // выводим количество найденных изображений.
     // images.length возвращает количество
     // элементов в массиве images.
-    console.log(`\nВсего найдено изображений: ${images.length}`);
+    // console.log(`\nВсего найдено изображений: ${images.length}`);
 
 
     // Возвращаем массив найденных изображений.
