@@ -16,10 +16,13 @@ import { validateImages } from './analyzer/imageValidator.js';
 // о больших изображениях.
 import { createLargeImagesReport } from './reports/largeImagesReport.js';
 
+// Импортируем функцию hashImages из Hash Engine.
+// Она рассчитывает SHA-256 для найденных изображений.
+import { hashImages } from './hash/hashEngine.js';
 
 // Адрес сайта, с которого начнётся обход.
 // Именно эту страницу первой откроет crawler.
-const startUrl = 'https://loginom.ru/';
+const startUrl = 'http://localhost:3000';
 
 // https://parentslike.ru/ - сайт для тестов
 // http://localhost:3000  - сайт для тестов
@@ -85,6 +88,23 @@ const images = await collectImages(pages);
 // Результат сохраняем в переменную validatedImages.
 const validatedImages = await validateImages(images);
 
+// Передаём проверенные изображения в Hash Engine.
+//
+// Hash Engine скачивает содержимое каждого изображения
+// и рассчитывает для него SHA-256.
+//
+// Результат сохраняем в переменную hashedImages.
+const hashedImages = await hashImages(validatedImages);
+
+// Вывод лолов с hash
+// console.log('\nSHA-256:');
+
+// for (const image of hashedImages) {
+//     console.log({
+//         image: image.imageUrl,
+//         sha256: image.sha256
+//     });
+// }
 
 // Выводим заголовок перед результатами проверки изображений.
 // console.log('\nValidated images:');
@@ -379,6 +399,10 @@ console.log(
 //     });
 // }
 
+ // Выводим количество обработанных изображений.
+    console.log(
+        `\nSHA-256 рассчитан для ${hashedImages.filter(image => image.sha256 !== null).length} изображений`
+    );
 
 // ==========================================
 // Время выполнения
