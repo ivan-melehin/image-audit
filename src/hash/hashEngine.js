@@ -260,6 +260,10 @@ export async function hashImages(images) {
                 await calculatePHash(buffer);
 
 
+            console.log(
+    `pHash: ${image.imageUrl} → ${perceptualHash}`
+);
+
             // Сохраняем исходные данные изображения
             // и добавляем два hash.
             hashedImages.push({

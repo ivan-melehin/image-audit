@@ -20,9 +20,28 @@ import { createLargeImagesReport } from './reports/largeImagesReport.js';
 // Она рассчитывает SHA-256 для найденных изображений.
 import { hashImages } from './hash/hashEngine.js';
 
+// Импортируем Duplicate Matcher.
+//
+// Он группирует изображения:
+// - по одинаковому SHA-256;
+// - по похожему pHash.
+import { findDuplicates } from './matcher/duplicateMatcher.js';
+
+// Импортируем функцию сохранения групп
+// в SQLite.
+import { saveDuplicateGroups } from './database/database.js';
+
+// Максимальное расстояние между двумя pHash,
+// при котором изображения считаются похожими.
+//
+// Чем меньше значение,
+// тем строже поиск похожих изображений.
+const SIMILARITY_THRESHOLD = 10;
+
+
 // Адрес сайта, с которого начнётся обход.
 // Именно эту страницу первой откроет crawler.
-const startUrl = 'http://localhost:3000';
+const startUrl = 'https://ivanmelekhin.ru/';
 
 // https://parentslike.ru/ - сайт для тестов
 // http://localhost:3000  - сайт для тестов
@@ -95,6 +114,33 @@ const validatedImages = await validateImages(images);
 //
 // Результат сохраняем в переменную hashedImages.
 const hashedImages = await hashImages(validatedImages);
+
+// Передаём изображения в Duplicate Matcher.
+//
+// Matcher:
+// 1. ищет полные дубликаты по SHA-256;
+// 2. ищет визуально похожие изображения по pHash.
+const duplicateGroups = findDuplicates(
+    hashedImages,
+    SIMILARITY_THRESHOLD
+);
+
+// Сохраняем найденные группы
+// в базу данных SQLite.
+saveDuplicateGroups(duplicateGroups);
+
+// Вывод в логи групп точных и похожих изображений
+console.log('\nDuplicate groups:');
+
+for (const group of duplicateGroups) {
+
+    console.log(`\nGroup #${group.id}`);
+    console.log(`Type: ${group.type}`);
+
+    for (const image of group.images) {
+        console.log(image.imageUrl);
+    }
+}
 
 // Вывод лолов с hash
 // console.log('\nSHA-256:');
