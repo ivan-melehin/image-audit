@@ -31,6 +31,8 @@ import { findDuplicates } from './matcher/duplicateMatcher.js';
 // в SQLite.
 import { saveDuplicateGroups } from './database/database.js';
 
+import { analyzeMetadata } from './metadata/metadataAnalyzer.js';
+
 // Максимальное расстояние между двумя pHash,
 // при котором изображения считаются похожими.
 //
@@ -41,7 +43,7 @@ const SIMILARITY_THRESHOLD = 10;
 
 // Адрес сайта, с которого начнётся обход.
 // Именно эту страницу первой откроет crawler.
-const startUrl = 'https://ivanmelekhin.ru/';
+const startUrl = 'http://localhost:3000';
 
 // https://parentslike.ru/ - сайт для тестов
 // http://localhost:3000  - сайт для тестов
@@ -107,6 +109,24 @@ const images = await collectImages(pages);
 // Результат сохраняем в переменную validatedImages.
 const validatedImages = await validateImages(images);
 
+// Передаём найденные изображения
+// в Metadata Analyzer.
+//
+// Metadata Analyzer получает:
+// - Author
+// - Creator
+// - Copyright
+// - Rights
+// - Software
+// - DateTimeOriginal
+// - EXIF
+// - IPTC
+// - XMP
+//
+const metadataResults = await analyzeMetadata(
+    validatedImages
+);
+
 // Передаём проверенные изображения в Hash Engine.
 //
 // Hash Engine скачивает содержимое каждого изображения
@@ -163,6 +183,45 @@ for (const group of duplicateGroups) {
 //     console.log(validatedImage);
 // }
 
+// ==========================================
+// Статистика метаданных
+// ==========================================
+
+
+// Изображения, у которых найден EXIF.
+const imagesWithExif = metadataResults.filter(
+    image => image.exif !== null
+);
+
+
+// Изображения, у которых найден IPTC.
+const imagesWithIptc = metadataResults.filter(
+    image => image.iptc !== null
+);
+
+
+// Изображения, у которых найден автор.
+const imagesWithAuthor = metadataResults.filter(
+    image =>
+        image.author !== null &&
+        image.author !== ''
+);
+
+
+// Изображения, у которых найден Copyright.
+const imagesWithCopyright = metadataResults.filter(
+    image =>
+        image.copyright !== null &&
+        image.copyright !== ''
+);
+
+
+// Изображения, у которых найден Software.
+const imagesWithSoftware = metadataResults.filter(
+    image =>
+        image.software !== null &&
+        image.software !== ''
+);
 
 // ==========================================
 // Итоговый отчёт
@@ -279,6 +338,36 @@ function formatFileSize(bytes) {
     return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 }
 
+// ------------------------------------------
+// Метаданные изображений
+// ------------------------------------------
+
+console.log('\nМетаданные изображений:');
+
+
+console.log(
+    `Изображений с EXIF: ${imagesWithExif.length}`
+);
+
+
+console.log(
+    `Изображений с IPTC: ${imagesWithIptc.length}`
+);
+
+
+console.log(
+    `Изображений с Author: ${imagesWithAuthor.length}`
+);
+
+
+console.log(
+    `Изображений с Copyright: ${imagesWithCopyright.length}`
+);
+
+
+console.log(
+    `Изображений с Software: ${imagesWithSoftware.length}`
+);
 
 // ==========================================
 // Вывод итогового отчёта

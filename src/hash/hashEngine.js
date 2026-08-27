@@ -213,7 +213,7 @@ export async function hashImages(images) {
         //
         // Если позже понадобится убрать
         // и этот вывод — его можно закомментировать.
-        console.log(`Hashing: ${image.imageUrl}`);
+        // console.log(`Hashing: ${image.imageUrl}`);
 
 
         try {
@@ -260,9 +260,13 @@ export async function hashImages(images) {
                 await calculatePHash(buffer);
 
 
-            console.log(
-    `pHash: ${image.imageUrl} → ${perceptualHash}`
-);
+//             console.log(
+//     `pHash: ${image.imageUrl} → ${perceptualHash}`
+// );
+
+//              console.log(
+//     `Hashing: ${i + 1}/${images.length}`
+// );
 
             // Сохраняем исходные данные изображения
             // и добавляем два hash.
@@ -299,7 +303,6 @@ export async function hashImages(images) {
             });
         }
     }
-
 
     // Возвращаем результат.
     return hashedImages;

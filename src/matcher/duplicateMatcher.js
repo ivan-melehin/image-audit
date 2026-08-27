@@ -179,20 +179,20 @@ export function findDuplicates(
                     imageB.perceptualHash
                 );
             
-                console.log(
-    `Compare: ${imageA.imageUrl} ↔ ${imageB.imageUrl} = ${distance}`
-);
+//                 console.log(
+//     `Compare: ${imageA.imageUrl} ↔ ${imageB.imageUrl} = ${distance}`
+// );
 
                 // Проверка хешей
-            console.log(
-    `Compare:\n` +
-    `  A: ${imageA.imageUrl}\n` +
-    `  B: ${imageB.imageUrl}\n` +
-    `  pHash A: ${imageA.perceptualHash}\n` +
-    `  pHash B: ${imageB.perceptualHash}\n` +
-    `  distance: ${distance}\n` +
-    `  threshold: ${similarityThreshold}`
-);
+//             console.log(
+//     `Compare:\n` +
+//     `  A: ${imageA.imageUrl}\n` +
+//     `  B: ${imageB.imageUrl}\n` +
+//     `  pHash A: ${imageA.perceptualHash}\n` +
+//     `  pHash B: ${imageB.perceptualHash}\n` +
+//     `  distance: ${distance}\n` +
+//     `  threshold: ${similarityThreshold}`
+// );
 
 
             // Если расстояние меньше

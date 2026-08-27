@@ -33,7 +33,8 @@ export async function collectImages(pages) {
         // Показываем в консоли,
         // какую страницу сейчас обрабатывает Image Collector.
         //console.log(`Collecting images: ${pageUrl}`);
-
+ 
+        
 
         // Начинаем блок обработки страницы.
         // Если страницу не получится загрузить,
