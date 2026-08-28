@@ -53,6 +53,52 @@ function isSmallTechnicalImage(imageUrl, fileSize) {
 }
 
 
+// Выполняем GET-запрос,
+// если сервер не разрешает HEAD.
+async function validateWithGet(imageUrl) {
+
+    const response = await axios.get(imageUrl, {
+        timeout: 10000,
+
+        headers: {
+            'User-Agent': 'Image-Audit/1.0'
+        },
+
+        // Разрешаем Axios получить любой HTTP-статус,
+        // чтобы самостоятельно обработать 404, 403, 500 и т. д.
+        validateStatus: () => true,
+
+        // Не загружаем содержимое изображения
+        // целиком в память.
+        responseType: 'stream'
+    });
+
+    const status = response.status;
+
+    const contentType =
+        response.headers['content-type'] || '';
+
+    const contentLength =
+        response.headers['content-length'];
+
+    const fileSize = contentLength
+        ? Number(contentLength)
+        : null;
+
+    // Закрываем поток,
+    // так как содержимое изображения нам сейчас не нужно.
+    if (response.data && typeof response.data.destroy === 'function') {
+        response.data.destroy();
+    }
+
+    return {
+        status,
+        contentType,
+        fileSize
+    };
+}
+
+
 // Проверяем все найденные изображения.
 export async function validateImages(images) {
 
@@ -63,48 +109,58 @@ export async function validateImages(images) {
     // найденные Image Collector.
     for (const image of images) {
 
-        //console.log(`Validating image: ${image.imageUrl}`);
-
         try {
 
-            // Отправляем HEAD-запрос.
-            // Он получает информацию о файле,
-            // но не скачивает само изображение.
-            const response = await axios.head(image.imageUrl, {
+            // Сначала пробуем HEAD-запрос.
+            // Он позволяет получить информацию о файле
+            // без загрузки изображения.
+            let response = await axios.head(image.imageUrl, {
                 timeout: 10000,
+
                 headers: {
                     'User-Agent': 'Image-Audit/1.0'
                 },
 
                 // Разрешаем Axios считать успешными
                 // любые HTTP-статусы.
-                // Это позволит самостоятельно обработать
-                // например 404 или 403.
                 validateStatus: () => true
             });
 
-            // Получаем HTTP-статус.
-            const status = response.status;
+            let status = response.status;
 
-            // Получаем Content-Type.
-            const contentType =
+            let contentType =
                 response.headers['content-type'] || '';
 
-            // Получаем размер файла.
-            // Content-Length приходит в байтах.
-            // Если сервер его не передал,
-            // значение будет null.
-            const contentLength =
+            let contentLength =
                 response.headers['content-length'];
 
-            const fileSize = contentLength
+            let fileSize = contentLength
                 ? Number(contentLength)
                 : null;
+
+
+            // Если сервер запрещает HEAD,
+            // повторяем проверку через GET.
+            if (status === 405) {
+
+                console.log(
+                    `HEAD 405 → GET: ${image.imageUrl}`
+                );
+
+                const getResult =
+                    await validateWithGet(image.imageUrl);
+
+                status = getResult.status;
+                contentType = getResult.contentType;
+                fileSize = getResult.fileSize;
+            }
+
 
             // Считаем изображение доступным,
             // если сервер ответил успешным статусом.
             const available =
                 status >= 200 && status < 300;
+
 
             // Проверяем, является ли изображение
             // небольшим техническим элементом.
@@ -114,10 +170,12 @@ export async function validateImages(images) {
                     fileSize
                 );
 
+
             // Пока фактическую проверку повреждения
             // изображения не выполняем.
             // Для неё потребуется скачать файл.
             const broken = null;
+
 
             // Добавляем к исходной информации
             // результаты нашего анализа.
