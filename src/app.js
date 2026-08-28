@@ -124,25 +124,29 @@ import { getUniqueImages } from './utils/getUniqueImages.js';
 //
 // ==========================================================
 
+
 import { reverseSearch } from './externalSearch/reverseSearch.js';
 
-import { MockProvider } from './externalSearch/providers/mockProvider.js';
+import { WebSearchProvider } from './externalSearch/providers/webSearchProvider.js';
 
 
-// Подключённые providers.
+// ==========================================================
+// EXTERNAL SEARCH PROVIDERS
+// ==========================================================
 //
-// Сейчас используется тестовый MockProvider.
+// Используем бесплатный WebSearchProvider.
 //
-// В дальнейшем здесь можно будет добавить:
+// TinEye и платные API не используются.
 //
-// new GoogleProvider()
-// new BingProvider()
-// new AnotherProvider()
-//
-// без изменения основной логики app.js.
+// ==========================================================
+
 const reverseSearchProviders = [
-    new MockProvider()
+    new WebSearchProvider({
+        name: 'web-search',
+        maxResults: 10
+    })
 ];
+
 
 
 // ==========================================================
@@ -204,7 +208,7 @@ const SIMILARITY_THRESHOLD = 10;
 
 // Сайт для тестирования.
 
-const startUrl = 'http://localhost:3000/';
+const startUrl = 'https://ivanmelekhin.ru/';
 
 // http://localhost:3000/
 // https://ivanmelekhin.ru/

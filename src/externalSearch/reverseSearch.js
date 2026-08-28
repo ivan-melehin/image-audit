@@ -1,122 +1,193 @@
-// Основной модуль внешнего поиска.
+// ==========================================================
+// Image Audit
+// src/externalSearch/reverseSearch.js
+// ==========================================================
 //
-// Он не зависит от конкретного API.
-// Provider передаётся снаружи.
+// Универсальный слой внешнего поиска.
+//
+// Provider может быть:
+//
+// - MockProvider
+// - WebSearchProvider
+// - TinEyeProvider
+// - любой другой provider
+//
+// reverseSearch не знает,
+// как именно provider выполняет поиск.
+//
+// ==========================================================
 
-export async function reverseSearch(images, providers = []) {
 
-    const results = [];
+export async function reverseSearch(
+    images,
+    providers = []
+) {
 
+    if (!Array.isArray(images)) {
 
-    // Если provider не подключён,
-    // просто возвращаем исходные изображения
-    // с пустыми результатами поиска.
-    if (!providers.length) {
-
-        return images.map(image => ({
-            ...image,
-            externalMatches: []
-        }));
+        throw new TypeError(
+            'reverseSearch: images должен быть массивом'
+        );
     }
 
 
-    // Перебираем изображения.
-    for (const image of images) {
+    if (!Array.isArray(providers)) {
 
-        const imageMatches = [];
+        throw new TypeError(
+            'reverseSearch: providers должен быть массивом'
+        );
+    }
 
 
-        // Технические изображения
-        // не отправляем во внешний поиск.
-        if (image.isSmallTechnical) {
+    // ------------------------------------------------------
+    // Результат.
+    //
+    // Копируем исходные объекты,
+    // чтобы не потерять metadata.
+    // ------------------------------------------------------
 
-            results.push({
+    const results =
+        images.map(
+            image => ({
+
                 ...image,
+
                 externalMatches: []
-            });
-
-            continue;
-        }
+            })
+        );
 
 
-        // Используем все подключённые providers.
-        for (const provider of providers) {
+    // ------------------------------------------------------
+    // Если providers нет,
+    // просто возвращаем изображения.
+    // ------------------------------------------------------
+
+    if (providers.length === 0) {
+
+        return results;
+    }
+
+
+    // ======================================================
+    // ПРОВЕРЯЕМ КАЖДОЕ ИЗОБРАЖЕНИЕ
+    // ======================================================
+
+    for (
+        const image
+        of results
+    ) {
+
+        // --------------------------------------------------
+        // Каждый provider получает изображение.
+        // --------------------------------------------------
+
+        for (
+            const provider
+            of providers
+        ) {
+
+            if (
+                !provider ||
+                typeof provider.search !==
+                'function'
+            ) {
+
+                console.log(
+                    'External Search: provider имеет неправильный формат'
+                );
+
+                continue;
+            }
+
 
             try {
 
-                console.log(
-                    `External Search [${provider.name}]: ${image.imageUrl}`
-                );
+                const matches =
+                    await provider.search(
+                        image
+                    );
 
 
-                const providerResults =
-                    await provider.search(image);
+                // ------------------------------------------------
+                // Provider должен вернуть массив.
+                // ------------------------------------------------
 
+                if (
+                    !Array.isArray(matches)
+                ) {
 
-                // Provider должен возвращать массив.
-                if (!Array.isArray(providerResults)) {
                     continue;
                 }
 
 
-                imageMatches.push(
-                    ...providerResults
-                );
+                // ------------------------------------------------
+                // Добавляем результаты.
+                // ------------------------------------------------
 
+                image.externalMatches.push(
+                    ...matches
+                );
 
             } catch (error) {
 
+                // ------------------------------------------------
                 // Ошибка одного provider
                 // не должна останавливать весь аудит.
-                console.error(
-                    `External Search failed [${provider.name}]: ${image.imageUrl}`
-                );
+                // ------------------------------------------------
 
-                console.error(error.message);
+                console.log(
+                    `External Search error [${provider.name || 'unknown'}]: ${error.message}`
+                );
             }
         }
 
 
-        // Удаляем одинаковые результаты.
-        const uniqueMatches =
-            removeDuplicateResults(imageMatches);
+        // --------------------------------------------------
+        // Удаляем одинаковые совпадения.
+        // --------------------------------------------------
+
+        const uniqueMatches = [];
 
 
-        results.push({
-            ...image,
-            externalMatches: uniqueMatches
-        });
+        const seen = new Set();
+
+
+        for (
+            const match
+            of image.externalMatches
+        ) {
+
+            const key =
+                [
+                    match.pageUrl,
+                    match.sourceUrl,
+                    match.provider
+                ]
+                    .join('|');
+
+
+            if (
+                seen.has(key)
+            ) {
+
+                continue;
+            }
+
+
+            seen.add(key);
+
+
+            uniqueMatches.push(
+                match
+            );
+        }
+
+
+        image.externalMatches =
+            uniqueMatches;
     }
 
 
     return results;
 }
 
-
-// Удаляем дубликаты внешних результатов.
-//
-// Один и тот же sourceUrl + pageUrl
-// считается одним результатом.
-function removeDuplicateResults(matches) {
-
-    const unique = new Map();
-
-
-    for (const match of matches) {
-
-        const key = [
-            match.sourceUrl || '',
-            match.pageUrl || ''
-        ].join('|');
-
-
-        // Если такого результата ещё нет,
-        // сохраняем его.
-        if (!unique.has(key)) {
-            unique.set(key, match);
-        }
-    }
-
-
-    return Array.from(unique.values());
-}

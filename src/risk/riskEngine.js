@@ -1,5 +1,5 @@
 // ==========================================================
-// Risk Engine
+// Image Audit
 // src/risk/riskEngine.js
 // ==========================================================
 //
@@ -22,6 +22,41 @@ import {
 
 
 // ==========================================================
+// СТАНДАРТНЫЕ СТОКОВЫЕ ДОМЕНЫ
+// ==========================================================
+//
+// Используются для определения,
+// что изображение связано с известным фотостоком.
+//
+// Проверяем не только URL,
+// но и поля метаданных:
+//
+// - Web Statement
+// - Licensor URL
+// - Credit
+// - Copyright
+// - Rights
+// - Description
+// - Author
+// - Creator
+//
+// ==========================================================
+
+const STOCK_DOMAINS = [
+
+    'istockphoto.com',
+    'gettyimages.com',
+    'shutterstock.com',
+    'adobe.com',
+    'stock.adobe.com',
+    'depositphotos.com',
+    'alamy.com',
+    'dreamstime.com'
+
+];
+
+
+// ==========================================================
 // ОПРЕДЕЛЕНИЕ УРОВНЯ РИСКА
 // ==========================================================
 
@@ -31,6 +66,7 @@ function getRiskLevel(score) {
         score >= RISK_LEVELS.CRITICAL.min &&
         score <= RISK_LEVELS.CRITICAL.max
     ) {
+
         return 'CRITICAL';
     }
 
@@ -39,6 +75,7 @@ function getRiskLevel(score) {
         score >= RISK_LEVELS.HIGH.min &&
         score <= RISK_LEVELS.HIGH.max
     ) {
+
         return 'HIGH';
     }
 
@@ -47,6 +84,7 @@ function getRiskLevel(score) {
         score >= RISK_LEVELS.MEDIUM.min &&
         score <= RISK_LEVELS.MEDIUM.max
     ) {
+
         return 'MEDIUM';
     }
 
@@ -56,12 +94,13 @@ function getRiskLevel(score) {
 
 
 // ==========================================================
-// ПРОВЕРКА НАЛИЧИЯ ВНЕШНИХ СОВПАДЕНИЙ
+// ВНЕШНИЕ СОВПАДЕНИЯ
 // ==========================================================
 
 function getExternalMatches(image) {
 
     if (!Array.isArray(image.externalMatches)) {
+
         return [];
     }
 
@@ -71,25 +110,13 @@ function getExternalMatches(image) {
 
 
 // ==========================================================
-// ПРОВЕРКА ТОЧНОГО СОВПАДЕНИЯ
+// EXACT MATCH
 // ==========================================================
 //
-// Пока MockProvider не сообщает отдельно,
-// является ли совпадение exact или visual.
-//
-// Поэтому для текущего этапа:
-//
 // similarity >= 90
-//      ↓
-// считаем точным совпадением.
+// считается точным совпадением.
 //
-// similarity < 90
-//      ↓
-// считаем визуальным совпадением.
-//
-// Позже реальный provider сможет
-// передавать отдельный тип совпадения.
-//
+// ==========================================================
 
 function hasExactMatch(matches) {
 
@@ -102,7 +129,12 @@ function hasExactMatch(matches) {
 
 
 // ==========================================================
-// ПРОВЕРКА ВИЗУАЛЬНОГО СОВПАДЕНИЯ
+// VISUAL MATCH
+// ==========================================================
+//
+// similarity 70–89
+// считается визуальным совпадением.
+//
 // ==========================================================
 
 function hasVisualMatch(matches) {
@@ -117,7 +149,7 @@ function hasVisualMatch(matches) {
 
 
 // ==========================================================
-// ПРОВЕРКА НАЙДЕННОГО ИСТОЧНИКА
+// SOURCE FOUND
 // ==========================================================
 
 function hasSource(matches) {
@@ -131,81 +163,315 @@ function hasSource(matches) {
 
 
 // ==========================================================
-// ОПРЕДЕЛЕНИЕ ФОТОСТОКА
+// ПОЛУЧЕНИЕ ВСЕХ ТЕКСТОВЫХ ДАННЫХ МЕТАДАННЫХ
 // ==========================================================
 //
-// Пока используем простой анализ URL.
+// Собираем основные поля ExifTool в одну строку.
 //
-// В дальнейшем это можно заменить
-// на отдельный Source Classifier.
+// Это позволяет искать:
+// - istockphoto.com
+// - Getty Images
+// - Shutterstock
+// - Asset ID
+// и т.д.
 //
+// ==========================================================
 
-function isStockSource(matches) {
+function getMetadataText(image) {
 
-    const stockDomains = [
-        'istockphoto.com',
-        'gettyimages.com',
-        'shutterstock.com',
-        'adobe.com',
-        'stock.adobe.com',
-        'depositphotos.com',
-        'alamy.com',
-        'dreamstime.com'
+    const fields = [
+
+        image.author,
+        image.creator,
+        image.copyright,
+        image.rights,
+        image.webStatement,
+        image.licensorURL,
+        image.copyrightNotice,
+        image.credit,
+        image.byLine,
+        image.assetID,
+        image.imageDescription,
+        image.description,
+        image.dateTimeOriginal
+
     ];
 
 
-    return matches.some(match => {
-
-        const urls = [
-            match.sourceUrl,
-            match.pageUrl
-        ];
-
-
-        return urls.some(url => {
-
-            if (typeof url !== 'string') {
-                return false;
-            }
-
-
-            const lowerUrl =
-                url.toLowerCase();
-
-
-            return stockDomains.some(
-                domain =>
-                    lowerUrl.includes(domain)
-            );
-        });
-    });
+    return fields
+        .filter(
+            value =>
+                value !== null &&
+                value !== undefined &&
+                value !== ''
+        )
+        .map(value => String(value).toLowerCase())
+        .join(' ');
 }
 
 
 // ==========================================================
-// ПРОВЕРКА МЕТАДАННЫХ АВТОРА
+// ОПРЕДЕЛЕНИЕ ФОТОСТОКА
+// ==========================================================
+//
+// Проверяем:
+//
+// 1. URL внешнего совпадения
+// 2. pageUrl внешнего совпадения
+// 3. метаданные изображения
+//
 // ==========================================================
 
-function hasAuthorMetadata(image) {
+function isStockSource(
+    image,
+    matches
+) {
 
-    return Boolean(
-        image.author ||
-        image.creator ||
-        image.byLine
+    // ------------------------------------------------------
+    // Проверяем внешние совпадения.
+    // ------------------------------------------------------
+
+    const externalStockMatch =
+        matches.some(match => {
+
+            const urls = [
+
+                match.sourceUrl,
+                match.pageUrl
+
+            ];
+
+
+            return urls.some(url => {
+
+                if (typeof url !== 'string') {
+
+                    return false;
+                }
+
+
+                const lowerUrl =
+                    url.toLowerCase();
+
+
+                return STOCK_DOMAINS.some(
+                    domain =>
+                        lowerUrl.includes(domain)
+                );
+            });
+        });
+
+
+    if (externalStockMatch) {
+
+        return true;
+    }
+
+
+    // ------------------------------------------------------
+    // Проверяем метаданные.
+    // ------------------------------------------------------
+
+    const metadataText =
+        getMetadataText(image);
+
+
+    return STOCK_DOMAINS.some(
+        domain =>
+            metadataText.includes(domain)
     );
 }
 
 
 // ==========================================================
-// ПРОВЕРКА COPYRIGHT
+// ОПРЕДЕЛЕНИЕ КОНКРЕТНОГО СТОКА
+// ==========================================================
+//
+// Нужно для более информативной причины:
+//
+// "Обнаружен стоковый источник: iStock / Getty Images"
+//
+// ==========================================================
+
+function getStockNames(
+    image,
+    matches
+) {
+
+    const stockNames = [];
+
+
+    const stockMap = [
+
+        {
+            domains: [
+                'istockphoto.com'
+            ],
+            name: 'iStock'
+        },
+
+        {
+            domains: [
+                'gettyimages.com'
+            ],
+            name: 'Getty Images'
+        },
+
+        {
+            domains: [
+                'shutterstock.com'
+            ],
+            name: 'Shutterstock'
+        },
+
+        {
+            domains: [
+                'adobe.com',
+                'stock.adobe.com'
+            ],
+            name: 'Adobe Stock'
+        },
+
+        {
+            domains: [
+                'depositphotos.com'
+            ],
+            name: 'Depositphotos'
+        },
+
+        {
+            domains: [
+                'alamy.com'
+            ],
+            name: 'Alamy'
+        },
+
+        {
+            domains: [
+                'dreamstime.com'
+            ],
+            name: 'Dreamstime'
+        }
+
+    ];
+
+
+    // ------------------------------------------------------
+    // Внешние URL
+    // ------------------------------------------------------
+
+    const externalText =
+        matches
+            .flatMap(match => [
+                match.sourceUrl,
+                match.pageUrl
+            ])
+            .filter(
+                value =>
+                    typeof value === 'string'
+            )
+            .join(' ')
+            .toLowerCase();
+
+
+    // ------------------------------------------------------
+    // Метаданные
+    // ------------------------------------------------------
+
+    const metadataText =
+        getMetadataText(image);
+
+
+    const allText =
+        `${externalText} ${metadataText}`;
+
+
+    // ------------------------------------------------------
+    // Определяем найденные стоки.
+    // ------------------------------------------------------
+
+    for (const stock of stockMap) {
+
+        const found =
+            stock.domains.some(
+                domain =>
+                    allText.includes(domain)
+            );
+
+
+        if (found) {
+
+            stockNames.push(stock.name);
+        }
+    }
+
+
+    return stockNames;
+}
+
+
+// ==========================================================
+// AUTHOR METADATA
+// ==========================================================
+
+function hasAuthorMetadata(image) {
+
+    return Boolean(
+
+        image.author ||
+        image.creator ||
+        image.byLine
+
+    );
+}
+
+
+// ==========================================================
+// COPYRIGHT METADATA
 // ==========================================================
 
 function hasCopyrightMetadata(image) {
 
     return Boolean(
+
         image.copyright ||
         image.rights ||
         image.copyrightNotice
+
+    );
+}
+
+
+// ==========================================================
+// ASSET ID
+// ==========================================================
+//
+// Наличие Asset ID является сильным признаком
+// происхождения изображения из фотостока
+// или другой системы управления цифровыми активами.
+//
+// ==========================================================
+
+function hasAssetId(image) {
+
+    return Boolean(
+        image.assetID
+    );
+}
+
+
+// ==========================================================
+// LICENSE / RIGHTS INFORMATION
+// ==========================================================
+
+function hasLicenseMetadata(image) {
+
+    return Boolean(
+
+        image.webStatement ||
+        image.licensorURL ||
+        image.rights
+
     );
 }
 
@@ -229,9 +495,9 @@ export function calculateRisk(
         getExternalMatches(image);
 
 
-    // ------------------------------------------------------
+    // ======================================================
     // 1. EXACT MATCH
-    // ------------------------------------------------------
+    // ======================================================
 
     const exactMatch =
         hasExactMatch(matches);
@@ -241,18 +507,23 @@ export function calculateRisk(
 
         score += RISK_POINTS.exactMatch;
 
+
         factors.push({
+
             code: 'exactMatch',
+
             points: RISK_POINTS.exactMatch,
+
             description:
                 'Найдено точное внешнее совпадение'
+
         });
     }
 
 
-    // ------------------------------------------------------
+    // ======================================================
     // 2. VISUAL MATCH
-    // ------------------------------------------------------
+    // ======================================================
 
     const visualMatch =
         hasVisualMatch(matches);
@@ -262,18 +533,23 @@ export function calculateRisk(
 
         score += RISK_POINTS.visualMatch;
 
+
         factors.push({
+
             code: 'visualMatch',
+
             points: RISK_POINTS.visualMatch,
+
             description:
                 'Найдено визуальное совпадение'
+
         });
     }
 
 
-    // ------------------------------------------------------
+    // ======================================================
     // 3. SOURCE FOUND
-    // ------------------------------------------------------
+    // ======================================================
 
     const sourceFound =
         hasSource(matches);
@@ -283,39 +559,84 @@ export function calculateRisk(
 
         score += RISK_POINTS.sourceFound;
 
+
         factors.push({
+
             code: 'sourceFound',
+
             points: RISK_POINTS.sourceFound,
+
             description:
                 'Найден предполагаемый источник изображения'
+
         });
     }
 
 
-    // ------------------------------------------------------
+    // ======================================================
     // 4. STOCK SOURCE
-    // ------------------------------------------------------
+    // ======================================================
+    //
+    // Проверяем как внешние результаты,
+    // так и метаданные.
+    //
+    // Это ключевое изменение.
+    //
+    // Например:
+    //
+    // Web Statement:
+    // https://www.istockphoto.com/...
+    //
+    // Credit:
+    // Getty Images
+    //
+    // → будет определён стоковый источник.
+    //
+    // ======================================================
 
     const stockSource =
-        isStockSource(matches);
+        isStockSource(
+            image,
+            matches
+        );
+
+
+    const stockNames =
+        getStockNames(
+            image,
+            matches
+        );
 
 
     if (stockSource) {
 
         score += RISK_POINTS.stockSource;
 
+
+        const stockDescription =
+            stockNames.length > 0
+
+                ? `Обнаружен источник изображения на фотостоке: ${stockNames.join(', ')}`
+
+                : 'Обнаружен источник изображения на стоковом сайте';
+
+
         factors.push({
+
             code: 'stockSource',
+
             points: RISK_POINTS.stockSource,
+
             description:
-                'Найден источник на фотостоке'
+                stockDescription
+
         });
     }
 
 
-    // ------------------------------------------------------
+    // ======================================================
     // 5. AUTHOR METADATA
-    // ------------------------------------------------------
+    // ======================================================
 
     const authorMetadata =
         hasAuthorMetadata(image);
@@ -325,18 +646,23 @@ export function calculateRisk(
 
         score += RISK_POINTS.authorMetadata;
 
+
         factors.push({
+
             code: 'authorMetadata',
+
             points: RISK_POINTS.authorMetadata,
+
             description:
                 'Автор указан в метаданных'
+
         });
     }
 
 
-    // ------------------------------------------------------
+    // ======================================================
     // 6. COPYRIGHT METADATA
-    // ------------------------------------------------------
+    // ======================================================
 
     const copyrightMetadata =
         hasCopyrightMetadata(image);
@@ -346,52 +672,117 @@ export function calculateRisk(
 
         score += RISK_POINTS.copyrightMetadata;
 
+
         factors.push({
+
             code: 'copyrightMetadata',
+
             points: RISK_POINTS.copyrightMetadata,
+
             description:
                 'Информация о Copyright указана в метаданных'
+
         });
     }
 
 
-    // ------------------------------------------------------
-    // 7. SOURCE UNKNOWN
-    // ------------------------------------------------------
+    // ======================================================
+    // 7. ASSET ID
+    // ======================================================
 
+    const assetId =
+        hasAssetId(image);
+
+
+    if (
+        assetId &&
+        RISK_POINTS.assetId !== undefined
+    ) {
+
+        score += RISK_POINTS.assetId;
+
+
+        factors.push({
+
+            code: 'assetId',
+
+            points: RISK_POINTS.assetId,
+
+            description:
+                'В метаданных указан Asset ID изображения'
+
+        });
+    }
+
+
+    // ======================================================
+    // 8. LICENSE / RIGHTS
+    // ======================================================
+
+    const licenseMetadata =
+        hasLicenseMetadata(image);
+
+
+    if (
+        licenseMetadata &&
+        RISK_POINTS.licenseMetadata !== undefined
+    ) {
+
+        score += RISK_POINTS.licenseMetadata;
+
+
+        factors.push({
+
+            code: 'licenseMetadata',
+
+            points: RISK_POINTS.licenseMetadata,
+
+            description:
+                'В метаданных указана информация о лицензии или правах'
+
+        });
+    }
+
+
+    // ======================================================
+    // 9. SOURCE UNKNOWN
+    // ======================================================
     //
-    // Добавляем этот признак только тогда,
-    // когда внешних совпадений нет
-    // и источник изображения не определён
-    // по имеющимся данным.
+    // Если вообще нет признаков происхождения,
+    // добавляем небольшой риск.
     //
+    // ======================================================
 
     const sourceUnknown =
         matches.length === 0 &&
         !hasAuthorMetadata(image) &&
-        !hasCopyrightMetadata(image);
+        !hasCopyrightMetadata(image) &&
+        !stockSource &&
+        !assetId &&
+        !licenseMetadata;
 
 
     if (sourceUnknown) {
 
         score += RISK_POINTS.sourceUnknown;
 
+
         factors.push({
+
             code: 'sourceUnknown',
+
             points: RISK_POINTS.sourceUnknown,
+
             description:
                 'Источник изображения не установлен'
+
         });
     }
 
 
-    // ------------------------------------------------------
+    // ======================================================
     // ОГРАНИЧЕНИЕ SCORE
-    // ------------------------------------------------------
-
-    //
-    // Risk Score не может быть больше 100.
-    //
+    // ======================================================
 
     score = Math.min(
         score,
@@ -399,17 +790,17 @@ export function calculateRisk(
     );
 
 
-    // ------------------------------------------------------
+    // ======================================================
     // УРОВЕНЬ РИСКА
-    // ------------------------------------------------------
+    // ======================================================
 
     const level =
         getRiskLevel(score);
 
 
-    // ------------------------------------------------------
+    // ======================================================
     // РЕЗУЛЬТАТ
-    // ------------------------------------------------------
+    // ======================================================
 
     return {
 
@@ -419,7 +810,6 @@ export function calculateRisk(
 
         riskFactors: factors,
 
-        // Сохраняем технические признаки.
         indicators: {
 
             exactMatch,
@@ -434,8 +824,14 @@ export function calculateRisk(
 
             copyrightMetadata,
 
+            assetId,
+
+            licenseMetadata,
+
             sourceUnknown
+
         }
+
     };
 }
 
@@ -459,15 +855,22 @@ export function calculateRisks(
 
 
         return {
+
             ...image,
 
-            riskScore: risk.riskScore,
+            riskScore:
+                risk.riskScore,
 
-            riskLevel: risk.riskLevel,
+            riskLevel:
+                risk.riskLevel,
 
-            riskFactors: risk.riskFactors,
+            riskFactors:
+                risk.riskFactors,
 
-            riskIndicators: risk.indicators
+            riskIndicators:
+                risk.indicators
+
         };
     });
 }
+
