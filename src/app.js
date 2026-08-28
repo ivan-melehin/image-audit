@@ -31,6 +31,11 @@ import { findDuplicates } from './matcher/duplicateMatcher.js';
 // в SQLite.
 import { saveDuplicateGroups } from './database/database.js';
 
+// Импортируем Metadata Analyzer.
+//
+// Он получает проверенные изображения
+// и извлекает из них EXIF, IPTC и другие
+// доступные метаданные с помощью ExifTool.
 import { analyzeMetadata } from './metadata/metadataAnalyzer.js';
 
 // Максимальное расстояние между двумя pHash,
@@ -109,23 +114,27 @@ const images = await collectImages(pages);
 // Результат сохраняем в переменную validatedImages.
 const validatedImages = await validateImages(images);
 
-// Передаём найденные изображения
+
+// Передаём проверенные изображения
 // в Metadata Analyzer.
 //
-// Metadata Analyzer получает:
+// Analyzer скачивает изображения,
+// передаёт их ExifTool и извлекает:
 // - Author
 // - Creator
 // - Copyright
 // - Rights
-// - Software
-// - DateTimeOriginal
+// - Web Statement
+// - Licensor URL
+// - Copyright Notice
 // - EXIF
 // - IPTC
-// - XMP
 //
-const metadataResults = await analyzeMetadata(
-    validatedImages
-);
+// Результат сохраняем в metadataImages.
+const metadataImages = await analyzeMetadata(validatedImages);
+
+console.log('\nDEBUG Metadata Analyzer:');
+console.log(metadataImages);
 
 // Передаём проверенные изображения в Hash Engine.
 //
@@ -183,45 +192,45 @@ for (const group of duplicateGroups) {
 //     console.log(validatedImage);
 // }
 
-// ==========================================
-// Статистика метаданных
-// ==========================================
+// // ==========================================
+// // Статистика метаданных
+// // ==========================================
 
 
-// Изображения, у которых найден EXIF.
-const imagesWithExif = metadataResults.filter(
-    image => image.exif !== null
-);
+// // Изображения, у которых найден EXIF.
+// const imagesWithExif = metadataResults.filter(
+//     image => image.exif !== null
+// );
 
 
-// Изображения, у которых найден IPTC.
-const imagesWithIptc = metadataResults.filter(
-    image => image.iptc !== null
-);
+// // Изображения, у которых найден IPTC.
+// const imagesWithIptc = metadataResults.filter(
+//     image => image.iptc !== null
+// );
 
 
-// Изображения, у которых найден автор.
-const imagesWithAuthor = metadataResults.filter(
-    image =>
-        image.author !== null &&
-        image.author !== ''
-);
+// // Изображения, у которых найден автор.
+// const imagesWithAuthor = metadataResults.filter(
+//     image =>
+//         image.author !== null &&
+//         image.author !== ''
+// );
 
 
-// Изображения, у которых найден Copyright.
-const imagesWithCopyright = metadataResults.filter(
-    image =>
-        image.copyright !== null &&
-        image.copyright !== ''
-);
+// // Изображения, у которых найден Copyright.
+// const imagesWithCopyright = metadataResults.filter(
+//     image =>
+//         image.copyright !== null &&
+//         image.copyright !== ''
+// );
 
 
-// Изображения, у которых найден Software.
-const imagesWithSoftware = metadataResults.filter(
-    image =>
-        image.software !== null &&
-        image.software !== ''
-);
+// // Изображения, у которых найден Software.
+// const imagesWithSoftware = metadataResults.filter(
+//     image =>
+//         image.software !== null &&
+//         image.software !== ''
+// );
 
 // ==========================================
 // Итоговый отчёт
@@ -338,36 +347,7 @@ function formatFileSize(bytes) {
     return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 }
 
-// ------------------------------------------
-// Метаданные изображений
-// ------------------------------------------
 
-console.log('\nМетаданные изображений:');
-
-
-console.log(
-    `Изображений с EXIF: ${imagesWithExif.length}`
-);
-
-
-console.log(
-    `Изображений с IPTC: ${imagesWithIptc.length}`
-);
-
-
-console.log(
-    `Изображений с Author: ${imagesWithAuthor.length}`
-);
-
-
-console.log(
-    `Изображений с Copyright: ${imagesWithCopyright.length}`
-);
-
-
-console.log(
-    `Изображений с Software: ${imagesWithSoftware.length}`
-);
 
 // ==========================================
 // Вывод итогового отчёта
@@ -538,6 +518,82 @@ console.log(
     console.log(
         `\nSHA-256 рассчитан для ${hashedImages.filter(image => image.sha256 !== null).length} изображений`
     );
+
+
+// ==========================================
+// Проверка Metadata Analyzer
+// ==========================================
+
+// Находим изображения,
+// в которых были обнаружены какие-либо
+// интересующие нас авторские метаданные.
+const imagesWithMetadata = metadataImages.filter(
+    image =>
+        image.author ||
+        image.creator ||
+        image.copyright ||
+        image.rights ||
+        image.webStatement ||
+        image.licensorURL ||
+        image.copyrightNotice
+);
+
+
+// Выводим количество изображений
+// с найденными метаданными.
+console.log('\nМетаданные:');
+
+console.log(
+    `Изображений с метаданными: ${imagesWithMetadata.length}`
+);
+
+
+// Если нашли изображения с метаданными,
+// выводим их в консоль.
+if (imagesWithMetadata.length > 0) {
+
+    console.log('\nНайденные метаданные:');
+
+
+    imagesWithMetadata.forEach((image, index) => {
+
+        console.log(`\n${index + 1}.`);
+
+        console.log(
+            `Изображение: ${image.imageUrl}`
+        );
+
+        console.log(
+            `Author: ${image.author || '—'}`
+        );
+
+        console.log(
+            `Creator: ${image.creator || '—'}`
+        );
+
+        console.log(
+            `Copyright: ${image.copyright || '—'}`
+        );
+
+        console.log(
+            `Rights: ${image.rights || '—'}`
+        );
+
+        console.log(
+            `Web Statement: ${image.webStatement || '—'}`
+        );
+
+        console.log(
+            `Licensor URL: ${image.licensorURL || '—'}`
+        );
+
+        console.log(
+            `Copyright Notice: ${image.copyrightNotice || '—'}`
+        );
+    });
+}
+
+
 
 // ==========================================
 // Время выполнения
