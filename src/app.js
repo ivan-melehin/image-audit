@@ -15,19 +15,19 @@
 //      ↓
 // 4. Hash Engine
 //      ↓
-// 5. Удаление повторных URL для Metadata Analyzer
+// 5. Metadata Analyzer
 //      ↓
-// 6. Metadata Analyzer (ExifTool)
+// 6. Duplicate Matcher
 //      ↓
-// 7. External Search
+// 7. Обогащение Duplicate Groups метаданными
 //      ↓
-// 8. Duplicate Matcher
+// 8. SQLite
 //      ↓
-// 9. SQLite
+// 9. Reverse Search
 //      ↓
 // 10. Risk Engine
 //      ↓
-// 11. Итоговый отчёт
+// 11. Итоговый Excel-отчёт
 //
 // ==========================================================
 
@@ -36,152 +36,136 @@
 // ИМПОРТЫ
 // ==========================================================
 
-// Crawler.
+
+// ----------------------------------------------------------
+// Crawler
+// ----------------------------------------------------------
+//
 // Обходит сайт и находит страницы.
+
 import { crawl } from './crawler/crawler.js';
 
 
-// Image Collector.
+// ----------------------------------------------------------
+// Image Collector
+// ----------------------------------------------------------
+//
 // Находит изображения на найденных страницах.
+
 import { collectImages } from './collector/imageCollector.js';
 
 
-// Image Validator.
-// Проверяет доступность изображений,
-// HTTP-статус, Content-Type, размер и т.д.
+// ----------------------------------------------------------
+// Image Validator
+// ----------------------------------------------------------
+//
+// Проверяет:
+//
+// - HTTP status
+// - Content-Type
+// - размер
+// - доступность
+// - технические изображения
+
 import { validateImages } from './analyzer/imageValidator.js';
 
 
-// Hash Engine.
+// ----------------------------------------------------------
+// Hash Engine
+// ----------------------------------------------------------
 //
 // Рассчитывает:
+//
 // - SHA-256
 // - perceptual hash
+
 import { hashImages } from './hash/hashEngine.js';
 
 
-// Duplicate Matcher.
+// ----------------------------------------------------------
+// Metadata Analyzer
+// ----------------------------------------------------------
 //
-// Ищет:
-// - exact duplicates по SHA-256
-// - similar images по pHash
-import { findDuplicates } from './matcher/duplicateMatcher.js';
+// Анализирует метаданные изображения
+// через ExifTool.
 
-
-// SQLite.
-//
-// Сохраняет найденные группы дубликатов.
-import { saveDuplicateGroups } from './database/database.js';
-
-
-// Metadata Analyzer.
-//
-// Использует ExifTool.
-//
-// Получает:
-// - Author
-// - Creator
-// - Copyright
-// - Rights
-// - Web Statement
-// - Licensor URL
-// - Copyright Notice
-// - Credit
-// - By-line
-// - Asset ID
-// - Image Description
-// - Description
-// - DateTimeOriginal
-// - EXIF
-// - IPTC
-// - XMP
 import { analyzeMetadata } from './metadata/metadataAnalyzer.js';
 
 
-// Функция удаления повторных изображений.
+// ----------------------------------------------------------
+// getUniqueImages
+// ----------------------------------------------------------
 //
-// Одно и то же изображение может быть найдено
-// на нескольких страницах.
+// Убирает повторяющиеся изображения
+// по SHA-256 перед Metadata Analyzer.
 //
-// Metadata Analyzer и External Search
-// получают только уникальные изображения.
+// Это позволяет не запускать ExifTool
+// несколько раз для одного и того же файла.
+
 import { getUniqueImages } from './utils/getUniqueImages.js';
 
 
-// ==========================================================
-// EXTERNAL SEARCH
-// ==========================================================
+// ----------------------------------------------------------
+// Duplicate Matcher
+// ----------------------------------------------------------
 //
-// Reverse Image Search.
+// Ищет:
 //
-// reverseSearch не зависит от конкретного API.
+// - exact duplicates по SHA-256
+// - similar images по pHash
 //
-// Сейчас подключён MockProvider,
-// чтобы протестировать архитектуру.
-//
-// В дальнейшем MockProvider можно заменить
-// на реальные providers внешнего поиска.
-//
-// ==========================================================
+// Также импортируем функцию,
+// которая связывает найденные группы
+// с результатами Metadata Analyzer.
 
+import {
+    findDuplicates,
+    enrichDuplicateGroupsWithMetadata
+} from './matcher/duplicateMatcher.js';
+
+
+// ----------------------------------------------------------
+// SQLite
+// ----------------------------------------------------------
+//
+// Сохраняет найденные группы дубликатов
+// в базу данных.
+
+import { saveDuplicateGroups } from './database/database.js';
+
+
+// ----------------------------------------------------------
+// Reverse Search
+// ----------------------------------------------------------
+//
+// Поиск изображения во внешних источниках.
 
 import { reverseSearch } from './externalSearch/reverseSearch.js';
+
+
+// ----------------------------------------------------------
+// Reverse Search Provider
+// ----------------------------------------------------------
+//
+// Текущий провайдер внешнего поиска.
 
 import { WebSearchProvider } from './externalSearch/providers/webSearchProvider.js';
 
 
-// ==========================================================
-// EXTERNAL SEARCH PROVIDERS
-// ==========================================================
-//
-// Используем бесплатный WebSearchProvider.
-//
-// TinEye и платные API не используются.
-//
-// ==========================================================
-
-const reverseSearchProviders = [
-    new WebSearchProvider({
-        name: 'web-search',
-        maxResults: 10
-    })
-];
-
-
-
-// ==========================================================
-// RISK ENGINE
-// ==========================================================
+// ----------------------------------------------------------
+// Risk Engine
+// ----------------------------------------------------------
 //
 // Рассчитывает условный Risk Score.
-//
-// Risk Engine не определяет нарушение авторских прав.
-//
-// Он только оценивает наличие признаков,
-// требующих дополнительной проверки.
-//
-// ==========================================================
 
 import { calculateRisks } from './risk/riskEngine.js';
 
 
-// ==========================================================
-// EXCEL AUDIT REPORT
-// ==========================================================
+// ----------------------------------------------------------
+// Excel Report
+// ----------------------------------------------------------
 //
-// Единый Excel-отчёт по результатам всего аудита.
-//
-// Содержит:
-//
-// 1. Summary
-// 2. Images
-// 3. Risk
-// 4. External Matches
-// 5. Metadata
-// 6. Duplicates
-// 7. Large Images
-//
-// ==========================================================
+// Создаёт единый Excel-отчёт.
 
 import { createAuditReport } from './reports/auditReport.js';
 
@@ -191,42 +175,74 @@ import { createAuditReport } from './reports/auditReport.js';
 // ==========================================================
 
 
-// Максимальное расстояние между двумя pHash.
+// ----------------------------------------------------------
+// Similarity Threshold
+// ----------------------------------------------------------
 //
-// Чем меньше число:
+// Максимальное расстояние между двумя pHash,
+// при котором изображения считаются похожими.
 //
 // 5  → очень строго
 // 10 → стандартный вариант
 // 15 → более мягкое сравнение
 // 20 → ещё более мягкое
-//
-// Если distance <= threshold,
-// изображения считаются похожими.
 
 const SIMILARITY_THRESHOLD = 10;
 
 
-// Сайты для тестирования.
+// ----------------------------------------------------------
+// Сайт для проверки
+// ----------------------------------------------------------
 
-const startUrl = 'https://parentslike.ru/';
+const startUrl = 'http://localhost:3000/';
 
+
+// Другие варианты:
 // http://localhost:3000/
 // https://ivanmelekhin.ru/
 // https://parentslike.ru/
 // https://loginom.ru/
 
 
+// ----------------------------------------------------------
+// Ограничение размера изображения
+// ----------------------------------------------------------
+//
+// Изображения больше 1 MB
+// попадают в категорию больших.
+
+const largeImageLimit =
+    1024 * 1024;
+
+
+// ==========================================================
+// REVERSE SEARCH PROVIDERS
+// ==========================================================
+//
+// Используем бесплатный WebSearchProvider.
+//
+// В дальнейшем сюда можно добавить
+// другие providers.
+//
+// ==========================================================
+
+const reverseSearchProviders = [
+
+    new WebSearchProvider({
+
+        name: 'web-search',
+
+        maxResults: 10
+    })
+];
+
+
 // ==========================================================
 // НАЧАЛО АУДИТА
 // ==========================================================
 
-
-// Запоминаем время запуска.
-//
-// В конце посчитаем,
-// сколько времени занял весь аудит.
-
-const startTime = Date.now();
+const startTime =
+    Date.now();
 
 
 console.log('\n==========================================');
@@ -238,17 +254,18 @@ console.log('==========================================');
 // ЭТАП 1. CRAWLER
 // ==========================================================
 
-console.log('\n[1/10] Сканирование сайта...');
+console.log(
+    '\n[1/11] Сканирование сайта...'
+);
 
 
 // Запускаем crawler.
-//
-// pages — массив найденных страниц.
 
-const pages = await crawl(startUrl);
+const pages =
+    await crawl(startUrl);
 
 
-// Показываем количество найденных страниц.
+// Показываем количество страниц.
 
 console.log(
     `Найдено страниц: ${pages.length}`
@@ -259,18 +276,17 @@ console.log(
 // ЭТАП 2. IMAGE COLLECTOR
 // ==========================================================
 
-console.log('\n[2/10] Поиск изображений...');
+console.log(
+    '\n[2/11] Поиск изображений...'
+);
 
 
-// Передаём найденные страницы
-// в Image Collector.
-//
-// images — массив найденных изображений.
+// Находим изображения
+// на найденных страницах.
 
-const images = await collectImages(pages);
+const images =
+    await collectImages(pages);
 
-
-// Показываем количество найденных изображений.
 
 console.log(
     `Найдено изображений: ${images.length}`
@@ -281,21 +297,16 @@ console.log(
 // ЭТАП 3. IMAGE VALIDATOR
 // ==========================================================
 
-console.log('\n[3/10] Проверка изображений...');
+console.log(
+    '\n[3/11] Проверка изображений...'
+);
 
 
-// Validator проверяет:
-//
-// - HTTP status
-// - Content-Type
-// - размер
-// - доступность
-// - технические изображения
+// Проверяем доступность изображений.
 
-const validatedImages = await validateImages(images);
+const validatedImages =
+    await validateImages(images);
 
-
-// Показываем количество обработанных изображений.
 
 console.log(
     `Проверено изображений: ${validatedImages.length}`
@@ -306,25 +317,24 @@ console.log(
 // ЭТАП 4. HASH ENGINE
 // ==========================================================
 
-console.log('\n[4/10] Расчёт SHA-256 и perceptual hash...');
+console.log(
+    '\n[4/11] Расчёт SHA-256 и perceptual hash...'
+);
 
 
-// Hash Engine рассчитывает:
-//
-// SHA-256
-// pHash
-//
-// Результат сохраняем в hashedImages.
+// Рассчитываем SHA-256 и pHash.
 
-const hashedImages = await hashImages(validatedImages);
+const hashedImages =
+    await hashImages(validatedImages);
 
 
-// Показываем количество изображений,
-// для которых рассчитан SHA-256.
+// Считаем количество изображений,
+// для которых получен SHA-256.
 
-const sha256Count = hashedImages.filter(
-    image => image.sha256 !== null
-).length;
+const sha256Count =
+    hashedImages.filter(
+        image => image.sha256 !== null
+    ).length;
 
 
 console.log(
@@ -333,28 +343,35 @@ console.log(
 
 
 // ==========================================================
-// ЭТАП 5. УНИКАЛЬНЫЕ ИЗОБРАЖЕНИЯ
+// ЭТАП 5. UNIQUE IMAGES
 // ==========================================================
 //
-// Одно изображение может встречаться
-// на нескольких страницах.
+// Перед Metadata Analyzer оставляем
+// только один экземпляр каждого SHA-256.
 //
 // Например:
 //
-// page1 → test2.jpg
-// page2 → test2.jpg
-// page3 → test2.jpg
+// page1 → test.jpg → SHA ABC
+// page2 → test.jpg → SHA ABC
+// page3 → test.jpg → SHA ABC
 //
-// Поэтому создаём uniqueImages.
+// Для ExifTool:
 //
-// Metadata Analyzer и External Search
-// получают именно этот массив.
+// test.jpg → один раз
 //
+// При этом hashedImages продолжает содержать
+// ВСЕ экземпляры.
+//
+// ==========================================================
 
-const uniqueImages = getUniqueImages(hashedImages);
+console.log(
+    '\n[5/11] Подготовка уникальных изображений для Metadata...'
+);
 
 
-// Показываем статистику.
+const uniqueImages =
+    getUniqueImages(hashedImages);
+
 
 console.log(
     `Уникальных изображений для Metadata Analyzer: ${uniqueImages.length}`
@@ -365,59 +382,496 @@ console.log(
 // ЭТАП 6. METADATA ANALYZER
 // ==========================================================
 
-console.log('\n[5/10] Анализ метаданных через ExifTool...');
+console.log(
+    '\n[6/11] Анализ метаданных через ExifTool...'
+);
 
 
-// Передаём в Metadata Analyzer
-// ТОЛЬКО уникальные изображения.
+// Запускаем Metadata Analyzer.
 //
-// Благодаря этому одно и то же изображение,
-// найденное на нескольких страницах,
-// анализируется ExifTool один раз.
+// Важно:
+//
+// Здесь используется uniqueImages,
+// а не hashedImages.
+//
+// Поэтому один и тот же файл
+// не анализируется несколько раз.
 
-const metadataImages = await analyzeMetadata(uniqueImages);
+const metadataImages =
+    await analyzeMetadata(uniqueImages);
 
 
 // ==========================================================
-// ЭТАП 7. EXTERNAL SEARCH
+// СТАТИСТИКА METADATA
 // ==========================================================
 
-console.log('\n[6/10] Поиск внешних совпадений...');
+const imagesWithMetadata =
+    metadataImages.filter(
+
+        image =>
+            image.author ||
+            image.creator ||
+            image.copyright ||
+            image.rights ||
+            image.webStatement ||
+            image.licensorURL ||
+            image.copyrightNotice ||
+            image.credit ||
+            image.byLine ||
+            image.assetID ||
+            image.imageDescription ||
+            image.description ||
+            image.dateTimeOriginal
+
+    );
 
 
-// Передаём в External Search
-// уникальные изображения.
+console.log(
+    `Изображений с метаданными: ${imagesWithMetadata.length}`
+);
+
+
+// ==========================================================
+// ЭТАП 7. DUPLICATE MATCHER
+// ==========================================================
 //
-// Это важно:
+// Здесь впервые используем ВСЕ hashedImages.
 //
-// одно и то же изображение может находиться
-// на нескольких страницах сайта.
+// Это важно.
 //
-// Поэтому нет смысла несколько раз
-// отправлять один и тот же файл
+// Metadata Analyzer работал только
+// с уникальными файлами.
+//
+// Duplicate Matcher должен видеть
+// все вхождения.
+//
+// Например:
+//
+// page1 → test.jpg
+// page2 → test.jpg
+// page3 → test.jpg
+//
+// Все три записи должны попасть
+// в одну Duplicate Group.
+//
+// ==========================================================
+
+console.log(
+    '\n[7/11] Поиск дубликатов и похожих изображений...'
+);
+
+
+const duplicateGroups =
+    findDuplicates(
+        hashedImages,
+        SIMILARITY_THRESHOLD
+    );
+
+
+// ==========================================================
+// ОБОГАЩЕНИЕ DUPLICATE GROUPS METADATA
+// ==========================================================
+//
+// Теперь объединяем:
+//
+// duplicateGroups
+// +
+// metadataImages
+//
+// Например:
+//
+// Group #1:
+//
+// image A → metadata нет
+// image B → metadata есть
+// image C → metadata нет
+//
+// Результат:
+//
+// representative → image B
+// metadata       → image B
+//
+// При этом:
+//
+// image A
+// image B
+// image C
+//
+// остаются внутри group.images.
+//
+// ==========================================================
+
+console.log(
+    '\nСвязывание дубликатов с метаданными...'
+);
+
+
+const enrichedDuplicateGroups =
+    enrichDuplicateGroupsWithMetadata(
+        duplicateGroups,
+        metadataImages
+    );
+
+
+// ==========================================================
+// СТАТИСТИКА DUPLICATE GROUPS
+// ==========================================================
+
+const exactGroups =
+    enrichedDuplicateGroups.filter(
+        group => group.type === 'exact'
+    );
+
+
+const similarGroups =
+    enrichedDuplicateGroups.filter(
+        group => group.type === 'similar'
+    );
+
+
+const groupsWithMetadata =
+    enrichedDuplicateGroups.filter(
+        group => group.metadata !== null
+    );
+
+
+console.log(
+    `Exact groups: ${exactGroups.length}`
+);
+
+
+console.log(
+    `Similar groups: ${similarGroups.length}`
+);
+
+
+console.log(
+    `Групп с найденными метаданными: ${groupsWithMetadata.length}`
+);
+
+
+// ==========================================================
+// DUPLICATE GROUPS
+// ==========================================================
+
+console.log(
+    '\nDuplicate groups:'
+);
+
+
+if (enrichedDuplicateGroups.length === 0) {
+
+    console.log(
+        'Дубликатов и похожих изображений не найдено.'
+    );
+
+} else {
+
+    for (
+        const group
+        of enrichedDuplicateGroups
+    ) {
+
+        console.log(
+            `\nGroup #${group.id}`
+        );
+
+
+        console.log(
+            `Type: ${group.type}`
+        );
+
+
+        if (
+            group.type === 'exact'
+        ) {
+
+            console.log(
+                `SHA-256: ${group.sha256}`
+            );
+        }
+
+
+        if (
+            group.type === 'similar'
+        ) {
+
+            console.log(
+                `Threshold: ${group.threshold}`
+            );
+        }
+
+
+        // --------------------------------------------------
+        // Representative
+        // --------------------------------------------------
+
+        if (group.representative) {
+
+            console.log(
+                `Representative: ${group.representative.imageUrl}`
+            );
+
+        } else {
+
+            console.log(
+                'Representative: —'
+            );
+        }
+
+
+        // --------------------------------------------------
+        // Metadata
+        // --------------------------------------------------
+
+        if (group.metadata) {
+
+            console.log(
+                `Metadata Author: ${group.metadata.author || '—'}`
+            );
+
+
+            console.log(
+                `Metadata Copyright: ${group.metadata.copyright || '—'}`
+            );
+
+        } else {
+
+            console.log(
+                'Metadata: —'
+            );
+        }
+
+
+        // --------------------------------------------------
+        // Все изображения группы
+        // --------------------------------------------------
+
+        console.log(
+            'Images:'
+        );
+
+
+        for (
+            const image
+            of group.images
+        ) {
+
+            console.log(
+                `  ${image.imageUrl}`
+            );
+
+
+            console.log(
+                `  Page: ${image.pageUrl || '—'}`
+            );
+        }
+    }
+}
+
+
+// ==========================================================
+// ЭТАП 8. SQLITE
+// ==========================================================
+//
+// В SQLite теперь передаём уже обогащённые группы.
+//
+// То есть база получает:
+//
+// - все изображения группы
+// - metadata
+// - representative
+// - SHA-256
+// - тип группы
+// - threshold
+//
+// ==========================================================
+
+console.log(
+    '\n[8/11] Сохранение групп в базу данных...'
+);
+
+
+saveDuplicateGroups(
+    enrichedDuplicateGroups
+);
+
+
+console.log(
+    `В базу данных сохранено групп: ${enrichedDuplicateGroups.length}`
+);
+
+
+// ==========================================================
+// ЭТАП 9. REVERSE SEARCH
+// ==========================================================
+//
+// Reverse Search запускается ПОСЛЕ Duplicate Matcher.
+//
+// Это важно.
+//
+// Мы НЕ отправляем во внешний поиск
+// каждый экземпляр одного и того же изображения.
+//
+// Вместо этого:
+//
+// Duplicate Group
+//        ↓
+// representative
+//        ↓
+// Reverse Search
+//
+// ==========================================================
+
+
+// ----------------------------------------------------------
+// Подготавливаем изображения для Reverse Search
+// ----------------------------------------------------------
+//
+// Нам нужны только representative.
+//
+// Если representative отсутствует,
+// значит для группы нет подходящего
+// экземпляра с metadata.
+//
+// Такие группы пока пропускаем.
+//
+// ----------------------------------------------------------
+
+const representativeImages =
+    enrichedDuplicateGroups
+
+        .filter(
+            group =>
+                group.representative !== null &&
+                group.representative !== undefined
+        )
+
+        .map(
+            group =>
+                group.representative
+        );
+
+
+// ----------------------------------------------------------
+// Добавляем изображения, которые
+// вообще не входят в Duplicate Group.
+//
+// ----------------------------------------------------------
+//
+// Это важно.
+//
+// Reverse Search должен проверять
+// не только дубликаты.
+//
+// Например:
+//
+// image A → единственный экземпляр
+// image B → единственный экземпляр
+// image C → Duplicate Group
+//
+// A и B тоже должны попасть
 // во внешний поиск.
+//
+// Поэтому сначала собираем SHA-256
+// изображений, которые уже представлены
+// representative.
+//
+// ----------------------------------------------------------
+
+const representativeSha256 =
+    new Set(
+
+        representativeImages
+            .map(
+                image => image.sha256
+            )
+            .filter(Boolean)
+
+    );
+
+
+// ----------------------------------------------------------
+// Находим уникальные изображения,
+// которые не являются representative
+// существующих групп.
+//
+// ----------------------------------------------------------
+
+const standaloneImages =
+    metadataImages.filter(
+
+        image => {
+
+            if (!image.sha256) {
+                return true;
+            }
+
+
+            return !representativeSha256.has(
+                image.sha256
+            );
+        }
+    );
+
+
+// ----------------------------------------------------------
+// Финальный набор для Reverse Search.
+//
+// representative + standalone
+// ----------------------------------------------------------
+
+const reverseSearchImages = [
+
+    ...representativeImages,
+
+    ...standaloneImages
+
+];
+
+
+// ==========================================================
+// Запускаем Reverse Search
+// ==========================================================
+
+console.log(
+    '\n[9/11] Поиск внешних совпадений...'
+);
+
 
 const imagesWithExternalMatches =
     await reverseSearch(
-        metadataImages,
+        reverseSearchImages,
         reverseSearchProviders
     );
 
 
-// Считаем общее количество найденных
-// внешних совпадений.
+// ==========================================================
+// СТАТИСТИКА EXTERNAL SEARCH
+// ==========================================================
 
 const externalMatchesCount =
     imagesWithExternalMatches.reduce(
+
         (total, image) =>
+
             total +
+
             (
-                Array.isArray(image.externalMatches)
+                Array.isArray(
+                    image.externalMatches
+                )
                     ? image.externalMatches.length
                     : 0
             ),
+
         0
     );
+
+
+console.log(
+    `Проверено изображений во внешнем поиске: ${imagesWithExternalMatches.length}`
+);
 
 
 console.log(
@@ -425,20 +879,31 @@ console.log(
 );
 
 
-// Показываем информацию
-// о найденных внешних совпадениях.
+// ==========================================================
+// ВНЕШНИЕ СОВПАДЕНИЯ
+// ==========================================================
 
-if (externalMatchesCount > 0) {
+if (
+    externalMatchesCount > 0
+) {
 
-    console.log('\nВнешние совпадения:');
+    console.log(
+        '\nВнешние совпадения:'
+    );
 
 
-    for (const image of imagesWithExternalMatches) {
+    for (
+        const image
+        of imagesWithExternalMatches
+    ) {
 
         if (
-            !Array.isArray(image.externalMatches) ||
+            !Array.isArray(
+                image.externalMatches
+            ) ||
             image.externalMatches.length === 0
         ) {
+
             continue;
         }
 
@@ -448,7 +913,10 @@ if (externalMatchesCount > 0) {
         );
 
 
-        for (const match of image.externalMatches) {
+        for (
+            const match
+            of image.externalMatches
+        ) {
 
             console.log(
                 `  Source URL: ${match.sourceUrl || '—'}`
@@ -495,143 +963,26 @@ if (externalMatchesCount > 0) {
 
 
 // ==========================================================
-// ЭТАП 8. DUPLICATE MATCHER
-// ==========================================================
-
-console.log(
-    '\n[7/10] Поиск дубликатов и похожих изображений...'
-);
-
-
-// Здесь передаём ВСЕ hashedImages.
-//
-// Почему не uniqueImages?
-//
-// Потому что Duplicate Matcher должен видеть
-// все найденные вхождения изображений.
-//
-// Exact Duplicate определяется по SHA-256.
-//
-// Например:
-//
-// test2.jpg
-// test2.jpg
-// test2.jpg
-//
-// Все три записи имеют одинаковый SHA-256.
-//
-// Это позволяет определить,
-// что одно изображение используется
-// несколько раз.
-
-const duplicateGroups = findDuplicates(
-    hashedImages,
-    SIMILARITY_THRESHOLD
-);
-
-
-// ==========================================================
-// ЭТАП 9. СОХРАНЕНИЕ В SQLITE
-// ==========================================================
-
-console.log('\n[8/10] Сохранение групп в базу данных...');
-
-
-// Сохраняем найденные группы.
-
-saveDuplicateGroups(duplicateGroups);
-
-
-// Показываем количество групп.
-
-console.log(
-    `В базу данных сохранено групп: ${duplicateGroups.length}`
-);
-
-
-// ==========================================================
-// DUPLICATE GROUPS
-// ==========================================================
-
-console.log('\nDuplicate groups:');
-
-
-if (duplicateGroups.length === 0) {
-
-    console.log(
-        'Дубликатов и похожих изображений не найдено.'
-    );
-
-} else {
-
-    for (const group of duplicateGroups) {
-
-        console.log(
-            `\nGroup #${group.id}`
-        );
-
-
-        console.log(
-            `Type: ${group.type}`
-        );
-
-
-        // Если группа похожих изображений,
-        // показываем установленный threshold.
-
-        if (group.type === 'similar') {
-
-            console.log(
-                `Threshold: ${group.threshold}`
-            );
-        }
-
-
-        // Показываем изображения группы.
-
-        for (const image of group.images) {
-
-            console.log(
-                image.imageUrl
-            );
-        }
-    }
-}
-
-
-// ==========================================================
 // ЭТАП 10. RISK ENGINE
 // ==========================================================
 //
-// Risk Engine получает результаты:
+// Risk Engine получает:
 //
-// - Metadata Analyzer
-// - External Search
-// - Duplicate Matcher
-//
-// И рассчитывает:
-//
-// - Risk Score
-// - Risk Level
-// - Risk Factors
-//
-// Важно:
-//
-// Risk Score не является утверждением
-// о нарушении авторских прав.
-//
-// Это условная оценка риска,
-// требующая дополнительной проверки.
+// - результаты Reverse Search
+// - Duplicate Groups
 //
 // ==========================================================
 
-console.log('\n[9/10] Расчёт Risk Score...');
-
-
-const riskImages = calculateRisks(
-    imagesWithExternalMatches,
-    duplicateGroups
+console.log(
+    '\n[10/11] Расчёт Risk Score...'
 );
+
+
+const riskImages =
+    calculateRisks(
+        imagesWithExternalMatches,
+        enrichedDuplicateGroups
+    );
 
 
 console.log(
@@ -644,25 +995,36 @@ console.log(
 // ==========================================================
 
 const riskCounts = {
+
     LOW: 0,
+
     MEDIUM: 0,
+
     HIGH: 0,
+
     CRITICAL: 0
 };
 
 
-for (const image of riskImages) {
+for (
+    const image
+    of riskImages
+) {
 
     if (
         riskCounts[image.riskLevel] !== undefined
     ) {
 
-        riskCounts[image.riskLevel]++;
+        riskCounts[
+            image.riskLevel
+        ]++;
     }
 }
 
 
-console.log('\nRisk Score:');
+console.log(
+    '\nRisk Score:'
+);
 
 
 console.log(
@@ -689,38 +1051,25 @@ console.log(
 // СТАТИСТИКА HTTP
 // ==========================================================
 
-
-// Создаём объект,
-// в котором будем считать HTTP-статусы.
-//
-// Например:
-//
-// {
-//     200: 25,
-//     404: 2,
-//     403: 1
-// }
-
 const statusCounts = {};
 
 
-// Перебираем проверенные изображения.
+for (
+    const image
+    of validatedImages
+) {
 
-for (const image of validatedImages) {
+    const status =
+        image.status;
 
-    const status = image.status;
 
-
-    // Если такого статуса ещё нет,
-    // создаём счётчик.
-
-    if (!statusCounts[status]) {
+    if (
+        !statusCounts[status]
+    ) {
 
         statusCounts[status] = 0;
     }
 
-
-    // Увеличиваем счётчик.
 
     statusCounts[status]++;
 }
@@ -730,71 +1079,76 @@ for (const image of validatedImages) {
 // МАЛЕНЬКИЕ ИЗОБРАЖЕНИЯ
 // ==========================================================
 
-const smallImages = validatedImages.filter(
-    image => image.isSmallTechnical === true
-);
+const smallImages =
+    validatedImages.filter(
+        image =>
+            image.isSmallTechnical === true
+    );
 
 
 // ==========================================================
 // БОЛЬШИЕ ИЗОБРАЖЕНИЯ
 // ==========================================================
 
+const largeImages =
+    validatedImages.filter(
 
-// Максимальный размер обычного изображения.
-//
-// 1 MB = 1024 × 1024 байт.
+        image =>
 
-const largeImageLimit = 1024 * 1024;
+            typeof image.fileSize === 'number' &&
 
+            image.fileSize > largeImageLimit
 
-// Находим изображения,
-// размер которых больше 1 MB.
-
-const largeImages = validatedImages.filter(
-    image =>
-        typeof image.fileSize === 'number' &&
-        image.fileSize > largeImageLimit
-);
+    );
 
 
 // ==========================================================
 // НЕДОСТУПНЫЕ ИЗОБРАЖЕНИЯ
 // ==========================================================
 
-const unavailableImages = validatedImages.filter(
-    image => image.available === false
-);
+const unavailableImages =
+    validatedImages.filter(
+        image =>
+            image.available === false
+    );
 
 
 // ==========================================================
-// МЕТАДАННЫЕ
+// ВРЕМЯ ВЫПОЛНЕНИЯ
 // ==========================================================
 
+const endTime =
+    Date.now();
 
-// Находим изображения,
-// у которых есть хотя бы одно
-// интересующее нас поле.
 
-const imagesWithMetadata = metadataImages.filter(
-    image =>
-        image.author ||
-        image.creator ||
-        image.copyright ||
-        image.rights ||
-        image.webStatement ||
-        image.licensorURL ||
-        image.copyrightNotice ||
-        image.credit ||
-        image.byLine ||
-        image.assetID ||
-        image.imageDescription ||
-        image.description ||
-        image.dateTimeOriginal
-);
+const elapsedTime =
+    endTime - startTime;
+
+
+const hours =
+    Math.floor(
+        elapsedTime / 3600000
+    );
+
+
+const minutes =
+    Math.floor(
+        (elapsedTime % 3600000) / 60000
+    );
+
+
+const seconds =
+    Math.floor(
+        (elapsedTime % 60000) / 1000
+    );
+
+
+const elapsedTimeFormatted =
+    `${hours} ч. ${minutes} мин. ${seconds} сек.`;
 
 
 // ==========================================================
-// ИТОГОВЫЙ ОТЧЁТ
+// ИТОГОВАЯ СТАТИСТИКА
 // ==========================================================
 
 console.log('\n');
@@ -803,11 +1157,9 @@ console.log('              ИТОГОВЫЙ ОТЧЁТ');
 console.log('==========================================');
 
 
-// ----------------------------------------------------------
-// Общая статистика
-// ----------------------------------------------------------
-
-console.log('\nОбщая статистика:');
+console.log(
+    '\nОбщая статистика:'
+);
 
 
 console.log(
@@ -830,18 +1182,27 @@ console.log(
 );
 
 
-// ----------------------------------------------------------
+// ==========================================================
 // HTTP
-// ----------------------------------------------------------
+// ==========================================================
 
-console.log('\nHTTP-статусы:');
-
-
-const statuses = Object.keys(statusCounts)
-    .sort((a, b) => Number(a) - Number(b));
+console.log(
+    '\nHTTP-статусы:'
+);
 
 
-for (const status of statuses) {
+const statuses =
+    Object.keys(statusCounts)
+        .sort(
+            (a, b) =>
+                Number(a) - Number(b)
+        );
+
+
+for (
+    const status
+    of statuses
+) {
 
     console.log(
         `Статус ${status} — ${statusCounts[status]}`
@@ -849,11 +1210,13 @@ for (const status of statuses) {
 }
 
 
-// ----------------------------------------------------------
-// Маленькие изображения
-// ----------------------------------------------------------
+// ==========================================================
+// МАЛЕНЬКИЕ ИЗОБРАЖЕНИЯ
+// ==========================================================
 
-console.log('\nМаленькие изображения:');
+console.log(
+    '\nМаленькие изображения:'
+);
 
 
 console.log(
@@ -861,11 +1224,13 @@ console.log(
 );
 
 
-// ----------------------------------------------------------
-// Большие изображения
-// ----------------------------------------------------------
+// ==========================================================
+// БОЛЬШИЕ ИЗОБРАЖЕНИЯ
+// ==========================================================
 
-console.log('\nБольшие изображения:');
+console.log(
+    '\nБольшие изображения:'
+);
 
 
 console.log(
@@ -873,23 +1238,27 @@ console.log(
 );
 
 
-// ----------------------------------------------------------
-// Недоступные изображения
-// ----------------------------------------------------------
-
-console.log('\nНедоступные изображения:');
-
+// ==========================================================
+// НЕДОСТУПНЫЕ
+// ==========================================================
 
 console.log(
-    `Всего недоступных изображений: ${unavailableImages.length}`
+    '\nНедоступные изображения:'
 );
 
 
-// ----------------------------------------------------------
-// SHA-256
-// ----------------------------------------------------------
+console.log(
+    `Всего найдено недоступных изображений: ${unavailableImages.length}`
+);
 
-console.log('\nХеширование:');
+
+// ==========================================================
+// HASH
+// ==========================================================
+
+console.log(
+    '\nХеширование:'
+);
 
 
 console.log(
@@ -897,20 +1266,12 @@ console.log(
 );
 
 
-// ----------------------------------------------------------
-// Duplicate Matcher
-// ----------------------------------------------------------
+// ==========================================================
+// DUPLICATES
+// ==========================================================
 
-console.log('\nДубликаты:');
-
-
-const exactGroups = duplicateGroups.filter(
-    group => group.type === 'exact'
-);
-
-
-const similarGroups = duplicateGroups.filter(
-    group => group.type === 'similar'
+console.log(
+    '\nДубликаты:'
 );
 
 
@@ -924,11 +1285,23 @@ console.log(
 );
 
 
-// ----------------------------------------------------------
-// Metadata Analyzer
-// ----------------------------------------------------------
+console.log(
+    `Всего групп: ${enrichedDuplicateGroups.length}`
+);
 
-console.log('\nМетаданные:');
+
+console.log(
+    `Групп с metadata: ${groupsWithMetadata.length}`
+);
+
+
+// ==========================================================
+// METADATA
+// ==========================================================
+
+console.log(
+    '\nМетаданные:'
+);
 
 
 console.log(
@@ -941,15 +1314,17 @@ console.log(
 );
 
 
-// ----------------------------------------------------------
-// External Search
-// ----------------------------------------------------------
+// ==========================================================
+// EXTERNAL SEARCH
+// ==========================================================
 
-console.log('\nВнешний поиск:');
+console.log(
+    '\nВнешний поиск:'
+);
 
 
 console.log(
-    `Уникальных изображений проверено: ${imagesWithExternalMatches.length}`
+    `Изображений отправлено во внешний поиск: ${imagesWithExternalMatches.length}`
 );
 
 
@@ -958,16 +1333,21 @@ console.log(
 );
 
 
-// Если внешние совпадения найдены,
-// показываем краткую информацию.
-
-if (externalMatchesCount > 0) {
+if (
+    externalMatchesCount > 0
+) {
 
     const imagesWithMatches =
         imagesWithExternalMatches.filter(
+
             image =>
-                Array.isArray(image.externalMatches) &&
+
+                Array.isArray(
+                    image.externalMatches
+                ) &&
+
                 image.externalMatches.length > 0
+
         );
 
 
@@ -977,11 +1357,13 @@ if (externalMatchesCount > 0) {
 }
 
 
-// ----------------------------------------------------------
-// Risk Engine
-// ----------------------------------------------------------
+// ==========================================================
+// RISK
+// ==========================================================
 
-console.log('\nОценка риска:');
+console.log(
+    '\nОценка риска:'
+);
 
 
 console.log(
@@ -1010,187 +1392,12 @@ console.log(
 
 
 // ==========================================================
-// ДЕТАЛИ RISK ENGINE
+// ВРЕМЯ
 // ==========================================================
 
-if (riskImages.length > 0) {
-
-    console.log('\nДетали Risk Score:');
-
-
-    for (const image of riskImages) {
-
-        console.log(
-            `\nИзображение: ${image.imageUrl}`
-        );
-
-
-        console.log(
-            `Risk Score: ${image.riskScore}`
-        );
-
-
-        console.log(
-            `Risk Level: ${image.riskLevel}`
-        );
-
-
-        if (
-            Array.isArray(image.riskFactors) &&
-            image.riskFactors.length > 0
-        ) {
-
-            console.log('Причины:');
-
-
-            for (const factor of image.riskFactors) {
-
-                console.log(
-                    `  +${factor.points} — ${factor.description}`
-                );
-            }
-
-        } else {
-
-            console.log(
-                'Причины: —'
-            );
-        }
-    }
-}
-
-
-// ==========================================================
-// НАЙДЕННЫЕ МЕТАДАННЫЕ
-// ==========================================================
-
-
-// Если метаданные найдены,
-// показываем основные поля.
-
-if (imagesWithMetadata.length > 0) {
-
-    console.log('\nНайденные метаданные:');
-
-
-    imagesWithMetadata.forEach(
-        (image, index) => {
-
-            console.log(`\n${index + 1}.`);
-
-
-            console.log(
-                `Изображение: ${image.imageUrl}`
-            );
-
-
-            console.log(
-                `Author: ${image.author || '—'}`
-            );
-
-
-            console.log(
-                `Creator: ${image.creator || '—'}`
-            );
-
-
-            console.log(
-                `Copyright: ${image.copyright || '—'}`
-            );
-
-
-            console.log(
-                `Rights: ${image.rights || '—'}`
-            );
-
-
-            console.log(
-                `Web Statement: ${image.webStatement || '—'}`
-            );
-
-
-            console.log(
-                `Licensor URL: ${image.licensorURL || '—'}`
-            );
-
-
-            console.log(
-                `Copyright Notice: ${image.copyrightNotice || '—'}`
-            );
-
-
-            console.log(
-                `Credit: ${image.credit || '—'}`
-            );
-
-
-            console.log(
-                `By-line: ${image.byLine || '—'}`
-            );
-
-
-            console.log(
-                `Asset ID: ${image.assetID || '—'}`
-            );
-
-
-            console.log(
-                `Image Description: ${image.imageDescription || '—'}`
-            );
-
-
-            console.log(
-                `Description: ${image.description || '—'}`
-            );
-
-
-            console.log(
-                `DateTimeOriginal: ${image.dateTimeOriginal || '—'}`
-            );
-        }
-    );
-}
-
-
-// ==========================================================
-// ВРЕМЯ ВЫПОЛНЕНИЯ
-// ==========================================================
-
-const endTime = Date.now();
-
-
-const elapsedTime =
-    endTime - startTime;
-
-
-// Часы.
-
-const hours = Math.floor(
-    elapsedTime / 3600000
+console.log(
+    '\nВремя выполнения:'
 );
-
-
-// Минуты.
-
-const minutes = Math.floor(
-    (elapsedTime % 3600000) / 60000
-);
-
-
-// Секунды.
-
-const seconds = Math.floor(
-    (elapsedTime % 60000) / 1000
-);
-
-
-const elapsedTimeFormatted =
-    `${hours} ч. ${minutes} мин. ${seconds} сек.`;
-
-
-// Показываем время.
-
-console.log('\nВремя выполнения:');
 
 
 console.log(
@@ -1199,33 +1406,29 @@ console.log(
 
 
 // ==========================================================
-// ЭТАП 11. ЕДИНЫЙ EXCEL-ОТЧЁТ
+// ЭТАП 11. EXCEL
 // ==========================================================
 //
-// Создаём единый Excel-файл.
+// Создаём единый Excel-отчёт.
 //
-// В него передаём результаты
-// всех этапов аудита:
+// В отчёт передаём:
 //
-// - страницы
-// - изображения
-// - Validator
-// - Hash Engine
-// - Metadata
-// - External Search
-// - Duplicate Matcher
-// - Risk Engine
-// - большие изображения
-// - время выполнения
-//
-// В результате получаем один файл:
-//
-// Отчёты/
-//     localhost_YYYY-MM-DD_image-audit.xlsx
+// - pages
+// - images
+// - validatedImages
+// - uniqueImages
+// - metadataImages
+// - enrichedDuplicateGroups
+// - imagesWithExternalMatches
+// - riskImages
+// - largeImages
+// - elapsedTime
 //
 // ==========================================================
 
-console.log('\n[10/10] Создание единого Excel-отчёта...');
+console.log(
+    '\n[11/11] Создание единого Excel-отчёта...'
+);
 
 
 const auditReportPath =
@@ -1243,7 +1446,8 @@ const auditReportPath =
 
         metadataImages,
 
-        duplicateGroups,
+        duplicateGroups:
+            enrichedDuplicateGroups,
 
         imagesWithExternalMatches,
 
@@ -1251,7 +1455,8 @@ const auditReportPath =
 
         largeImages,
 
-        elapsedTime: elapsedTimeFormatted
+        elapsedTime:
+            elapsedTimeFormatted
     });
 
 

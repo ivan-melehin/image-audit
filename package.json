@@ -12,6 +12,8 @@
     "cheerio": "^1.2.0",
     "dotenv": "^17.4.2",
     "exiftool-vendored": "^37.2.0",
+    "form-data": "^4.0.6",
+    "playwright": "^1.62.1",
     "sharp": "^0.35.4",
     "tineye-api": "^2.0.6",
     "xlsx": "^0.18.5"
