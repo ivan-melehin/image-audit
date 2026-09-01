@@ -5,22 +5,17 @@
 //
 // Бесплатный поиск внешних источников изображения.
 //
+// Использует DuckDuckGo HTML.
+//
 // ВАЖНО:
-// Этот provider не использует TinEye и платные API.
 //
-// Алгоритм:
+// Это НЕ полноценный reverse image search.
+// Provider ищет:
+// - имя файла;
+// - имя файла без расширения;
+// - URL изображения;
 //
-// 1. Берём URL изображения.
-// 2. Формируем поисковые запросы:
-//      - имя файла
-//      - URL изображения
-//      - имя файла без расширения
-// 3. Выполняем обычный веб-поиск через DuckDuckGo HTML.
-// 4. Получаем найденные страницы.
-// 5. Возвращаем найденные URL.
-//
-// Это не полноценный reverse image search уровня TinEye.
-// Это бесплатный поиск внешних упоминаний/страниц.
+// Затем проверяет найденные страницы.
 //
 // ==========================================================
 
@@ -32,15 +27,31 @@ import * as cheerio from 'cheerio';
 // НАСТРОЙКИ
 // ==========================================================
 
-// Максимальное количество результатов
-// для одного поискового запроса.
+// Максимальное количество результатов,
+// которые берём из одного поискового запроса.
 
-const MAX_RESULTS_PER_QUERY = 10;
+const MAX_RESULTS_PER_QUERY = 5;
 
 
-// Таймаут HTTP-запроса.
+// Таймаут самого поиска.
 
-const REQUEST_TIMEOUT = 15000;
+const SEARCH_TIMEOUT = 8000;
+
+
+// Таймаут проверки найденной страницы.
+
+const PAGE_TIMEOUT = 5000;
+
+
+// Максимальное количество страниц,
+// которые реально проверяем.
+
+const MAX_PAGES_TO_INSPECT = 5;
+
+
+// Количество повторных попыток.
+
+const MAX_RETRIES = 1;
 
 
 // User-Agent.
@@ -49,6 +60,67 @@ const USER_AGENT =
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ' +
     'AppleWebKit/537.36 (KHTML, like Gecko) ' +
     'Chrome/139.0.0.0 Safari/537.36';
+
+
+// ==========================================================
+// СТАТИСТИКА
+// ==========================================================
+//
+// Храним статистику внутри provider.
+//
+// Это позволяет не засорять консоль,
+// но в конце получить краткую информацию.
+//
+
+let searchStatistics = {
+
+    imagesChecked: 0,
+
+    searchRequests: 0,
+
+    timeouts: 0,
+
+    errors: 0,
+
+    pagesInspected: 0,
+
+    matchesFound: 0
+};
+
+
+// ==========================================================
+// СБРОС СТАТИСТИКИ
+// ==========================================================
+
+function resetStatistics() {
+
+    searchStatistics = {
+
+        imagesChecked: 0,
+
+        searchRequests: 0,
+
+        timeouts: 0,
+
+        errors: 0,
+
+        pagesInspected: 0,
+
+        matchesFound: 0
+    };
+}
+
+
+// ==========================================================
+// ПОЛУЧЕНИЕ СТАТИСТИКИ
+// ==========================================================
+
+function getStatistics() {
+
+    return {
+        ...searchStatistics
+    };
+}
 
 
 // ==========================================================
@@ -70,9 +142,11 @@ function getFileName(imageUrl) {
         const parts =
             pathname.split('/');
 
-        return parts[
-            parts.length - 1
-        ] || '';
+        return (
+            parts[
+                parts.length - 1
+            ] || ''
+        );
 
     } catch {
 
@@ -107,7 +181,94 @@ function normalizeText(text) {
 
 
 // ==========================================================
-// ПОИСК ЧЕРЕЗ DUCKDUCKGO HTML
+// ПРОВЕРКА TIMEOUT
+// ==========================================================
+
+function isTimeoutError(error) {
+
+    return (
+        error?.code === 'ECONNABORTED' ||
+        error?.code === 'ETIMEDOUT' ||
+        error?.message?.toLowerCase().includes(
+            'timeout'
+        )
+    );
+}
+
+
+// ==========================================================
+// ЗАПРОС С ПОВТОРОМ
+// ==========================================================
+
+async function requestWithRetry(
+    url,
+    config,
+    retries = MAX_RETRIES
+) {
+
+    let lastError = null;
+
+
+    for (
+        let attempt = 0;
+        attempt <= retries;
+        attempt++
+    ) {
+
+        try {
+
+            return await axios.get(
+                url,
+                config
+            );
+
+        } catch (error) {
+
+            lastError = error;
+
+
+            if (
+                isTimeoutError(error)
+            ) {
+
+                searchStatistics.timeouts++;
+
+            } else {
+
+                searchStatistics.errors++;
+            }
+
+
+            // Если это была последняя попытка —
+            // дальше не повторяем.
+
+            if (
+                attempt >= retries
+            ) {
+
+                break;
+            }
+
+
+            // Небольшая задержка перед повтором.
+
+            await new Promise(
+                resolve =>
+                    setTimeout(
+                        resolve,
+                        500
+                    )
+            );
+        }
+    }
+
+
+    throw lastError;
+}
+
+
+// ==========================================================
+// ПОИСК ЧЕРЕЗ DUCKDUCKGO
 // ==========================================================
 
 async function searchDuckDuckGo(query) {
@@ -116,25 +277,37 @@ async function searchDuckDuckGo(query) {
         'https://html.duckduckgo.com/html/';
 
 
+    searchStatistics.searchRequests++;
+
+
     try {
 
         const response =
-            await axios.get(
+            await requestWithRetry(
+
                 searchUrl,
+
                 {
+
                     params: {
                         q: query
                     },
 
                     timeout:
-                        REQUEST_TIMEOUT,
+                        SEARCH_TIMEOUT,
+
+                    maxRedirects: 3,
 
                     headers: {
+
                         'User-Agent':
                             USER_AGENT,
 
                         'Accept':
-                            'text/html,application/xhtml+xml'
+                            'text/html,application/xhtml+xml',
+
+                        'Accept-Language':
+                            'ru-RU,ru;q=0.9,en;q=0.8'
                     }
                 }
             );
@@ -199,10 +372,9 @@ async function searchDuckDuckGo(query) {
                     href;
 
 
-                // DuckDuckGo может возвращать
-                // redirect URL.
-                //
-                // Пытаемся получить настоящий URL.
+                // --------------------------------------------------
+                // Получаем настоящий URL из redirect DuckDuckGo.
+                // --------------------------------------------------
 
                 try {
 
@@ -233,9 +405,23 @@ async function searchDuckDuckGo(query) {
                 }
 
 
+                if (
+                    !resultUrl.startsWith(
+                        'http://'
+                    ) &&
+                    !resultUrl.startsWith(
+                        'https://'
+                    )
+                ) {
+
+                    return;
+                }
+
+
                 results.push({
 
-                    url: resultUrl,
+                    url:
+                        resultUrl,
 
                     title,
 
@@ -247,12 +433,12 @@ async function searchDuckDuckGo(query) {
 
         return results;
 
-    } catch (error) {
+    } catch {
 
-        console.log(
-            `Web Search error: ${error.message}`
-        );
-
+        // Не выводим ошибку каждого timeout
+        // в консоль.
+        //
+        // Статистика всё равно сохраняется.
 
         return [];
     }
@@ -263,10 +449,10 @@ async function searchDuckDuckGo(query) {
 // ПРОВЕРКА СТРАНИЦЫ
 // ==========================================================
 //
-// После поиска страницы открываем найденную страницу
-// и проверяем, встречается ли там URL нашего изображения.
-//
-// Это позволяет отфильтровать часть ложных результатов.
+// Проверяем:
+// - полный URL изображения;
+// - URL без протокола;
+// - имя файла.
 //
 // ==========================================================
 
@@ -275,23 +461,33 @@ async function inspectPage(
     imageUrl
 ) {
 
+    searchStatistics.pagesInspected++;
+
+
     try {
 
         const response =
-            await axios.get(
-                pageUrl,
-                {
-                    timeout:
-                        REQUEST_TIMEOUT,
+            await requestWithRetry(
 
-                    maxRedirects: 5,
+                pageUrl,
+
+                {
+
+                    timeout:
+                        PAGE_TIMEOUT,
+
+                    maxRedirects: 3,
 
                     headers: {
+
                         'User-Agent':
                             USER_AGENT,
 
                         'Accept':
-                            'text/html,application/xhtml+xml'
+                            'text/html,application/xhtml+xml',
+
+                        'Accept-Language':
+                            'ru-RU,ru;q=0.9,en;q=0.8'
                     }
                 }
             );
@@ -303,12 +499,14 @@ async function inspectPage(
             ] || '';
 
 
-        // Нас интересуют HTML-страницы.
+        // Нас интересуют только HTML-страницы.
 
         if (
-            !contentType.includes(
-                'text/html'
-            )
+            !contentType
+                .toLowerCase()
+                .includes(
+                    'text/html'
+                )
         ) {
 
             return false;
@@ -318,15 +516,17 @@ async function inspectPage(
         const html =
             String(
                 response.data
-            );
+            ).toLowerCase();
 
 
         // --------------------------------------------------
-        // Проверяем прямое вхождение URL изображения.
+        // 1. Полный URL изображения.
         // --------------------------------------------------
 
         if (
-            html.includes(imageUrl)
+            html.includes(
+                imageUrl.toLowerCase()
+            )
         ) {
 
             return true;
@@ -334,15 +534,7 @@ async function inspectPage(
 
 
         // --------------------------------------------------
-        // Проверяем URL без protocol.
-        //
-        // Например:
-        //
-        // http://site.com/img/test.jpg
-        //
-        // превращается в:
-        //
-        // site.com/img/test.jpg
+        // 2. URL без protocol.
         // --------------------------------------------------
 
         try {
@@ -352,7 +544,8 @@ async function inspectPage(
 
 
             const withoutProtocol =
-                `${parsedImageUrl.host}${parsedImageUrl.pathname}`;
+                `${parsedImageUrl.host}${parsedImageUrl.pathname}`
+                    .toLowerCase();
 
 
             if (
@@ -371,16 +564,20 @@ async function inspectPage(
 
 
         // --------------------------------------------------
-        // Проверяем имя файла.
+        // 3. Имя файла.
         // --------------------------------------------------
 
         const fileName =
-            getFileName(imageUrl);
+            getFileName(
+                imageUrl
+            );
 
 
         if (
             fileName &&
-            html.includes(fileName)
+            html.includes(
+                fileName.toLowerCase()
+            )
         ) {
 
             return true;
@@ -391,13 +588,16 @@ async function inspectPage(
 
     } catch {
 
+        // Ошибки отдельных страниц
+        // не должны останавливать аудит.
+
         return false;
     }
 }
 
 
 // ==========================================================
-// ПРОВЕРКА ДОМЕНА
+// ПОЛУЧЕНИЕ HOSTNAME
 // ==========================================================
 
 function getHostname(url) {
@@ -414,6 +614,21 @@ function getHostname(url) {
 
 
 // ==========================================================
+// УДАЛЕНИЕ WWW
+// ==========================================================
+
+function normalizeHostname(hostname) {
+
+    return hostname
+        .toLowerCase()
+        .replace(
+            /^www\./,
+            ''
+        );
+}
+
+
+// ==========================================================
 // ОСНОВНОЙ PROVIDER
 // ==========================================================
 
@@ -424,6 +639,7 @@ export class WebSearchProvider {
         this.name =
             options.name ||
             'web-search';
+
 
         this.maxResults =
             options.maxResults ||
@@ -438,7 +654,7 @@ export class WebSearchProvider {
     async search(image) {
 
         const imageUrl =
-            image.imageUrl;
+            image?.imageUrl;
 
 
         if (!imageUrl) {
@@ -447,9 +663,7 @@ export class WebSearchProvider {
         }
 
 
-        console.log(
-            `External Search [web]: ${imageUrl}`
-        );
+        searchStatistics.imagesChecked++;
 
 
         // --------------------------------------------------
@@ -457,7 +671,9 @@ export class WebSearchProvider {
         // --------------------------------------------------
 
         const fileName =
-            getFileName(imageUrl);
+            getFileName(
+                imageUrl
+            );
 
 
         const fileNameWithoutExtension =
@@ -467,7 +683,7 @@ export class WebSearchProvider {
 
 
         // --------------------------------------------------
-        // Формируем поисковые запросы.
+        // Формируем запросы.
         // --------------------------------------------------
 
         const queries = [];
@@ -483,7 +699,8 @@ export class WebSearchProvider {
 
         if (
             fileNameWithoutExtension &&
-            fileNameWithoutExtension !== fileName
+            fileNameWithoutExtension !==
+                fileName
         ) {
 
             queries.push(
@@ -492,23 +709,57 @@ export class WebSearchProvider {
         }
 
 
-        // URL изображения.
+        // URL изображения используем
+        // только если он достаточно информативный.
+        //
+        // Для localhost такой запрос почти бесполезен.
 
-        queries.push(
-            `"${imageUrl}"`
-        );
+        let hostname =
+            getHostname(
+                imageUrl
+            );
+
+
+        hostname =
+            normalizeHostname(
+                hostname
+            );
+
+
+        if (
+            hostname &&
+            hostname !== 'localhost' &&
+            hostname !== '127.0.0.1'
+        ) {
+
+            queries.push(
+                `"${imageUrl}"`
+            );
+        }
 
 
         // --------------------------------------------------
-        // Удаляем дубликаты запросов.
+        // Удаляем дубликаты.
         // --------------------------------------------------
 
         const uniqueQueries =
-            [...new Set(queries)];
+            [
+                ...new Set(
+                    queries
+                )
+            ];
+
+
+        if (
+            uniqueQueries.length === 0
+        ) {
+
+            return [];
+        }
 
 
         // --------------------------------------------------
-        // Все результаты поиска.
+        // Выполняем поиск.
         // --------------------------------------------------
 
         const allResults = [];
@@ -535,46 +786,57 @@ export class WebSearchProvider {
         // Удаляем одинаковые URL.
         // --------------------------------------------------
 
-        const uniqueResults =
-            [];
-
-
         const seenUrls =
             new Set();
 
 
-        for (
-            const result
-            of allResults
-        ) {
+        const uniqueResults =
+            allResults.filter(
+                result => {
 
-            if (
-                !result.url ||
-                seenUrls.has(result.url)
-            ) {
+                    if (
+                        !result.url
+                    ) {
 
-                continue;
-            }
+                        return false;
+                    }
 
 
-            seenUrls.add(
-                result.url
+                    const normalizedUrl =
+                        result.url
+                            .trim()
+                            .toLowerCase();
+
+
+                    if (
+                        seenUrls.has(
+                            normalizedUrl
+                        )
+                    ) {
+
+                        return false;
+                    }
+
+
+                    seenUrls.add(
+                        normalizedUrl
+                    );
+
+
+                    return true;
+                }
             );
-
-
-            uniqueResults.push(
-                result
-            );
-        }
 
 
         // --------------------------------------------------
-        // Исключаем исходный сайт.
+        // Исключаем собственный сайт.
         // --------------------------------------------------
 
         const sourceHost =
-            getHostname(
-                imageUrl
+            normalizeHostname(
+                getHostname(
+                    imageUrl
+                )
             );
 
 
@@ -583,13 +845,22 @@ export class WebSearchProvider {
                 result => {
 
                     const resultHost =
-                        getHostname(
-                            result.url
+                        normalizeHostname(
+                            getHostname(
+                                result.url
+                            )
                         );
 
 
+                    if (
+                        !resultHost
+                    ) {
+
+                        return false;
+                    }
+
+
                     return (
-                        resultHost &&
                         resultHost !==
                         sourceHost
                     );
@@ -598,18 +869,25 @@ export class WebSearchProvider {
 
 
         // --------------------------------------------------
-        // Проверяем страницы.
+        // Проверяем найденные страницы.
         // --------------------------------------------------
 
         const matches = [];
 
 
+        const pagesToInspect =
+            externalResults.slice(
+                0,
+                Math.min(
+                    this.maxResults,
+                    MAX_PAGES_TO_INSPECT
+                )
+            );
+
+
         for (
             const result
-            of externalResults.slice(
-                0,
-                this.maxResults
-            )
+            of pagesToInspect
         ) {
 
             const containsImage =
@@ -649,7 +927,30 @@ export class WebSearchProvider {
         }
 
 
+        searchStatistics.matchesFound +=
+            matches.length;
+
+
         return matches;
     }
-}
 
+
+    // ======================================================
+    // GET STATISTICS
+    // ======================================================
+
+    getStatistics() {
+
+        return getStatistics();
+    }
+
+
+    // ======================================================
+    // RESET STATISTICS
+    // ======================================================
+
+    resetStatistics() {
+
+        resetStatistics();
+    }
+}

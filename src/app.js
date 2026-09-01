@@ -206,9 +206,9 @@ import { createAuditReport } from './reports/auditReport.js';
 const SIMILARITY_THRESHOLD = 10;
 
 
-// Сайт для тестирования.
+// Сайты для тестирования.
 
-const startUrl = 'https://ivanmelekhin.ru/';
+const startUrl = 'https://parentslike.ru/';
 
 // http://localhost:3000/
 // https://ivanmelekhin.ru/
