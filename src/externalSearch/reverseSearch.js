@@ -5,189 +5,128 @@
 //
 // Универсальный слой внешнего поиска.
 //
-// Provider может быть:
+// Provider отвечает за сам поиск.
+// Этот модуль отвечает за единый формат результата.
 //
-// - MockProvider
-// - WebSearchProvider
-// - TinEyeProvider
-// - любой другой provider
+// Особенно важно разделять:
 //
-// reverseSearch не знает,
-// как именно provider выполняет поиск.
+// - text       — найдено текстовым поиском;
+// - visual     — подтверждено визуальным сравнением;
+// - exact      — подтверждено точное визуальное совпадение.
+//
+// Нельзя считать обычный текстовый поиск визуальным match.
 //
 // ==========================================================
 
+function normalizeMatch(match, provider) {
+    const normalized = {
+        ...match
+    };
 
-export async function reverseSearch(
-    images,
-    providers = []
-) {
+    normalized.provider =
+        normalized.provider || provider?.name || 'unknown';
 
+    // Если provider явно указал тип — сохраняем его.
+    if (normalized.evidenceType) {
+        return normalized;
+    }
+
+    // Поддерживаем явные типы от будущих visual providers.
+    if (
+        normalized.matchType === 'exact' ||
+        normalized.matchType === 'exact_visual'
+    ) {
+        normalized.evidenceType = 'exact';
+        return normalized;
+    }
+
+    if (
+        normalized.matchType === 'visual' ||
+        normalized.matchType === 'visual_similarity'
+    ) {
+        normalized.evidenceType = 'visual';
+        return normalized;
+    }
+
+    // По умолчанию отсутствие подтверждённого визуального
+    // сравнения означает текстовое evidence.
+    normalized.evidenceType = 'text';
+
+    return normalized;
+}
+
+export async function reverseSearch(images, providers = []) {
     if (!Array.isArray(images)) {
-
         throw new TypeError(
             'reverseSearch: images должен быть массивом'
         );
     }
 
-
     if (!Array.isArray(providers)) {
-
         throw new TypeError(
             'reverseSearch: providers должен быть массивом'
         );
     }
 
-
-    // ------------------------------------------------------
-    // Результат.
-    //
-    // Копируем исходные объекты,
-    // чтобы не потерять metadata.
-    // ------------------------------------------------------
-
-    const results =
-        images.map(
-            image => ({
-
-                ...image,
-
-                externalMatches: []
-            })
-        );
-
-
-    // ------------------------------------------------------
-    // Если providers нет,
-    // просто возвращаем изображения.
-    // ------------------------------------------------------
+    const results = images.map(image => ({
+        ...image,
+        externalMatches: []
+    }));
 
     if (providers.length === 0) {
-
         return results;
     }
 
-
-    // ======================================================
-    // ПРОВЕРЯЕМ КАЖДОЕ ИЗОБРАЖЕНИЕ
-    // ======================================================
-
-    for (
-        const image
-        of results
-    ) {
-
-        // --------------------------------------------------
-        // Каждый provider получает изображение.
-        // --------------------------------------------------
-
-        for (
-            const provider
-            of providers
-        ) {
-
-            if (
-                !provider ||
-                typeof provider.search !==
-                'function'
-            ) {
-
+    for (const image of results) {
+        for (const provider of providers) {
+            if (!provider || typeof provider.search !== 'function') {
                 console.log(
                     'External Search: provider имеет неправильный формат'
                 );
-
                 continue;
             }
 
-
             try {
+                const matches = await provider.search(image);
 
-                const matches =
-                    await provider.search(
-                        image
-                    );
-
-
-                // ------------------------------------------------
-                // Provider должен вернуть массив.
-                // ------------------------------------------------
-
-                if (
-                    !Array.isArray(matches)
-                ) {
-
+                if (!Array.isArray(matches)) {
                     continue;
                 }
 
-
-                // ------------------------------------------------
-                // Добавляем результаты.
-                // ------------------------------------------------
-
                 image.externalMatches.push(
-                    ...matches
+                    ...matches.map(match =>
+                        normalizeMatch(match, provider)
+                    )
                 );
-
             } catch (error) {
-
-                // ------------------------------------------------
-                // Ошибка одного provider
-                // не должна останавливать весь аудит.
-                // ------------------------------------------------
-
+                // Ошибка одного provider не должна останавливать аудит.
                 console.log(
                     `External Search error [${provider.name || 'unknown'}]: ${error.message}`
                 );
             }
         }
 
-
-        // --------------------------------------------------
-        // Удаляем одинаковые совпадения.
-        // --------------------------------------------------
-
         const uniqueMatches = [];
-
-
         const seen = new Set();
 
+        for (const match of image.externalMatches) {
+            const key = [
+                match.pageUrl,
+                match.sourceUrl,
+                match.provider,
+                match.evidenceType
+            ].join('|');
 
-        for (
-            const match
-            of image.externalMatches
-        ) {
-
-            const key =
-                [
-                    match.pageUrl,
-                    match.sourceUrl,
-                    match.provider
-                ]
-                    .join('|');
-
-
-            if (
-                seen.has(key)
-            ) {
-
+            if (seen.has(key)) {
                 continue;
             }
 
-
             seen.add(key);
-
-
-            uniqueMatches.push(
-                match
-            );
+            uniqueMatches.push(match);
         }
 
-
-        image.externalMatches =
-            uniqueMatches;
+        image.externalMatches = uniqueMatches;
     }
-
 
     return results;
 }
-
