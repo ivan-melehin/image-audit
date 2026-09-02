@@ -1,576 +1,234 @@
 // ==========================================================
-// Duplicate Matcher
+// Image Audit
 // src/matcher/duplicateMatcher.js
 // ==========================================================
 //
-// Задачи этого модуля:
+// Ищет:
+// 1. точные дубликаты по SHA-256;
+// 2. похожие изображения по pHash.
 //
-// 1. Найти точные дубликаты по SHA-256.
-// 2. Найти похожие изображения по pHash.
-// 3. Сохранить ВСЕ экземпляры изображений,
-//    найденные на разных страницах.
-// 4. После Metadata Analyzer связать группы дубликатов
-//    с найденными метаданными.
-// 5. Выбрать representative — экземпляр изображения,
-//    который будет использоваться на следующих этапах,
-//    например Reverse Search.
+// Для похожих изображений используется граф:
+// если A похож на B, а B похож на C, все три изображения
+// относятся к одной connected component.
+// Это корректнее, чем алгоритм "первое изображение + похожие".
 //
 // ==========================================================
 
-
-// ==========================================================
-// ИМПОРТЫ
-// ==========================================================
-
-// Функция рассчитывает расстояние
-// между двумя perceptual hash.
 import { hammingDistance } from '../hash/hashEngine.js';
 
+function createUnionFind(size) {
+    const parent = Array.from({ length: size }, (_, index) => index);
+    const rank = new Array(size).fill(0);
 
-// ==========================================================
-// FIND DUPLICATES
-// ==========================================================
-//
-// Основная функция поиска дубликатов.
-//
-// images — ВСЕ изображения после Hash Engine.
-//
-// similarityThreshold — максимально допустимое
-// расстояние между двумя pHash.
-//
-// ==========================================================
+    function find(index) {
+        while (parent[index] !== index) {
+            parent[index] = parent[parent[index]];
+            index = parent[index];
+        }
 
-export function findDuplicates(
-    images,
-    similarityThreshold = 10
-) {
+        return index;
+    }
 
-    // ======================================================
-    // Общий массив групп
-    // ======================================================
+    function union(a, b) {
+        const rootA = find(a);
+        const rootB = find(b);
+
+        if (rootA === rootB) {
+            return;
+        }
+
+        if (rank[rootA] < rank[rootB]) {
+            parent[rootA] = rootB;
+        } else if (rank[rootA] > rank[rootB]) {
+            parent[rootB] = rootA;
+        } else {
+            parent[rootB] = rootA;
+            rank[rootA]++;
+        }
+    }
+
+    return { find, union };
+}
+
+function buildSimilarGroups(images, threshold, excluded) {
+    const candidates = images
+        .map((image, index) => ({ image, index }))
+        .filter(({ image }) =>
+            !excluded.has(image) &&
+            Boolean(image.perceptualHash)
+        );
+
+    if (candidates.length < 2) {
+        return [];
+    }
+
+    const unionFind = createUnionFind(candidates.length);
+
+    // Сравниваем каждую пару кандидатов.
+    // Это всё ещё O(n²), но теперь результатом является
+    // полноценное объединение связанных похожих изображений.
+    for (let i = 0; i < candidates.length; i++) {
+        for (let j = i + 1; j < candidates.length; j++) {
+            const distance = hammingDistance(
+                candidates[i].image.perceptualHash,
+                candidates[j].image.perceptualHash
+            );
+
+            if (
+                distance !== null &&
+                distance <= threshold
+            ) {
+                unionFind.union(i, j);
+            }
+        }
+    }
+
+    const components = new Map();
+
+    for (let i = 0; i < candidates.length; i++) {
+        const root = unionFind.find(i);
+
+        if (!components.has(root)) {
+            components.set(root, []);
+        }
+
+        components.get(root).push(candidates[i].image);
+    }
+
+    return Array.from(components.values())
+        .filter(group => group.length >= 2);
+}
+
+export function findDuplicates(images, similarityThreshold = 10) {
+    if (!Array.isArray(images)) {
+        throw new TypeError(
+            'findDuplicates: images должен быть массивом'
+        );
+    }
 
     const groups = [];
-
-
-    // ======================================================
-    // ЭТАП 1. EXACT DUPLICATES
-    // ======================================================
-    //
-    // Exact Duplicate определяется по SHA-256.
-    //
-    // Одинаковый SHA-256 означает,
-    // что содержимое файлов полностью совпадает.
-    //
-    // ======================================================
-
     const exactGroups = new Map();
 
-
     // ------------------------------------------------------
-    // Собираем изображения по SHA-256
+    // 1. EXACT DUPLICATES
     // ------------------------------------------------------
 
     for (const image of images) {
-
-        // Если SHA-256 отсутствует,
-        // определить точный дубликат невозможно.
-
         if (!image.sha256) {
             continue;
         }
 
-
-        // Если такого SHA-256 ещё нет,
-        // создаём новую группу.
-
         if (!exactGroups.has(image.sha256)) {
-
-            exactGroups.set(
-                image.sha256,
-                []
-            );
+            exactGroups.set(image.sha256, []);
         }
 
-
-        // Добавляем изображение
-        // в группу с соответствующим SHA-256.
-
-        exactGroups
-            .get(image.sha256)
-            .push(image);
+        exactGroups.get(image.sha256).push(image);
     }
 
-
-    // ======================================================
-    // Создаём EXACT-группы
-    // ======================================================
+    const groupedImages = new Set();
 
     for (const [sha256, groupImages] of exactGroups) {
-
-        // Если изображение встретилось только один раз,
-        // это не дубликат.
-
         if (groupImages.length < 2) {
             continue;
         }
 
-
-        // Создаём группу.
+        for (const image of groupImages) {
+            groupedImages.add(image);
+        }
 
         groups.push({
-
-            // Уникальный номер группы.
-
-            id:
-                groups.length + 1,
-
-
-            // Тип группы.
-
-            type:
-                'exact',
-
-
-            // Общий SHA-256.
-
+            id: groups.length + 1,
+            type: 'exact',
             sha256,
-
-
-            // ВСЕ экземпляры изображения.
-            //
-            // Здесь специально ничего не удаляем.
-
-            images:
-                groupImages
+            images: groupImages
         });
     }
 
+    // ------------------------------------------------------
+    // 2. SIMILAR IMAGES
+    // ------------------------------------------------------
 
-    // ======================================================
-    // ЭТАП 2. ПОМЕЧАЕМ EXACT DUPLICATES
-    // ======================================================
-    //
-    // Изображения, которые уже входят
-    // в Exact-группу, не должны повторно
-    // участвовать в поиске Similar.
-    //
-    // ======================================================
+    const similarGroups = buildSimilarGroups(
+        images,
+        similarityThreshold,
+        groupedImages
+    );
 
-    const groupedImages = new Set();
-
-
-    // Добавляем изображения
-    // из Exact-групп.
-
-    for (const group of groups) {
-
-        for (const image of group.images) {
-
-            groupedImages.add(image);
-        }
+    for (const groupImages of similarGroups) {
+        groups.push({
+            id: groups.length + 1,
+            type: 'similar',
+            threshold: similarityThreshold,
+            images: groupImages
+        });
     }
-
-
-    // ======================================================
-    // ЭТАП 3. SIMILAR IMAGES
-    // ======================================================
-    //
-    // Для изображений, которые не попали
-    // в Exact Duplicate,
-    // сравниваем perceptual hash.
-    //
-    // ======================================================
-
-    for (let i = 0; i < images.length; i++) {
-
-        const imageA = images[i];
-
-
-        // --------------------------------------------------
-        // Изображение уже находится
-        // в Exact-группе.
-        // --------------------------------------------------
-
-        if (groupedImages.has(imageA)) {
-            continue;
-        }
-
-
-        // --------------------------------------------------
-        // Нет perceptual hash.
-        // --------------------------------------------------
-
-        if (!imageA.perceptualHash) {
-            continue;
-        }
-
-
-        // --------------------------------------------------
-        // Создаём потенциальную Similar-группу.
-        // --------------------------------------------------
-
-        const similarImages = [
-            imageA
-        ];
-
-
-        // --------------------------------------------------
-        // Сравниваем с последующими изображениями.
-        // --------------------------------------------------
-
-        for (
-            let j = i + 1;
-            j < images.length;
-            j++
-        ) {
-
-            const imageB = images[j];
-
-
-            // Уже входит в другую группу.
-
-            if (groupedImages.has(imageB)) {
-                continue;
-            }
-
-
-            // Нет pHash.
-
-            if (!imageB.perceptualHash) {
-                continue;
-            }
-
-
-            // ------------------------------------------------
-            // Рассчитываем Hamming Distance.
-            // ------------------------------------------------
-
-            const distance =
-                hammingDistance(
-                    imageA.perceptualHash,
-                    imageB.perceptualHash
-                );
-
-
-            // ------------------------------------------------
-            // Проверяем threshold.
-            // ------------------------------------------------
-
-            if (
-                distance !== null &&
-                distance <= similarityThreshold
-            ) {
-
-                // Добавляем изображение
-                // в текущую группу.
-
-                similarImages.push(
-                    imageB
-                );
-
-
-                // Помечаем его как сгруппированное.
-
-                groupedImages.add(
-                    imageB
-                );
-            }
-        }
-
-
-        // ==================================================
-        // Создаём Similar-группу,
-        // если найдено минимум два изображения.
-        // ==================================================
-
-        if (similarImages.length > 1) {
-
-            // Добавляем первое изображение
-            // в Set сгруппированных изображений.
-
-            groupedImages.add(
-                imageA
-            );
-
-
-            groups.push({
-
-                // Уникальный номер группы.
-
-                id:
-                    groups.length + 1,
-
-
-                // Тип группы.
-
-                type:
-                    'similar',
-
-
-                // Использованный threshold.
-
-                threshold:
-                    similarityThreshold,
-
-
-                // Все изображения группы.
-
-                images:
-                    similarImages
-            });
-        }
-    }
-
-
-    // ======================================================
-    // Возвращаем группы.
-    // ======================================================
 
     return groups;
 }
 
+function hasMetadata(image) {
+    return Boolean(
+        image.author ||
+        image.creator ||
+        image.copyright ||
+        image.rights ||
+        image.webStatement ||
+        image.licensorURL ||
+        image.copyrightNotice ||
+        image.credit ||
+        image.byLine ||
+        image.assetID ||
+        image.imageDescription ||
+        image.description ||
+        image.dateTimeOriginal
+    );
+}
 
-// ==========================================================
-// ENRICH DUPLICATE GROUPS WITH METADATA
-// ==========================================================
-//
-// Функция вызывается ПОСЛЕ Metadata Analyzer.
-//
-// Она получает:
-//
-// duplicateGroups
-//     ↓
-// группы дубликатов, содержащие ВСЕ экземпляры
-//
-// metadataImages
-//     ↓
-// изображения, которые реально были обработаны ExifTool
-//
-// ==========================================================
-//
-// Главная задача:
-//
-// Если группа содержит:
-//
-// image A → metadata нет
-// image B → metadata есть
-// image C → metadata нет
-//
-// то результат должен быть:
-//
-// representative → image B
-// metadata       → metadata image B
-//
-// При этом:
-//
-// image A
-// image B
-// image C
-//
-// ВСЕ остаются внутри group.images.
-//
-// ==========================================================
-
+// После Metadata Analyzer выбираем representative.
+// Для exact-группы SHA общий.
+// Для similar-группы ищем любой экземпляр с metadata.
 export function enrichDuplicateGroupsWithMetadata(
     duplicateGroups,
-    metadataImages
+    metadataImages = []
 ) {
-
-    // ======================================================
-    // Создаём Map метаданных по SHA-256.
-    // ======================================================
-    //
-    // Например:
-    //
-    // ABC123 → image с metadata
-    // DEF456 → image с metadata
-    //
-    // Это позволяет быстро найти metadata
-    // для конкретной группы.
-    //
-    // ======================================================
-
     const metadataBySha256 = new Map();
 
-
-    // ------------------------------------------------------
-    // Перебираем результаты Metadata Analyzer.
-    // ------------------------------------------------------
-
     for (const image of metadataImages) {
-
-        // Нам нужен SHA-256.
-
-        const sha256 =
-            image.sha256;
-
-
-        // Если SHA-256 отсутствует,
-        // сопоставить изображение с группой невозможно.
-
-        if (!sha256) {
+        if (!image.sha256 || !hasMetadata(image)) {
             continue;
         }
 
-
-        // Проверяем, действительно ли
-        // Metadata Analyzer получил метаданные.
-        //
-        // Используем те же поля,
-        // которые используются в app.js
-        // для определения наличия metadata.
-
-        const hasMetadata =
-            Boolean(
-                image.author ||
-                image.creator ||
-                image.copyright ||
-                image.rights ||
-                image.webStatement ||
-                image.licensorURL ||
-                image.copyrightNotice ||
-                image.credit ||
-                image.byLine ||
-                image.assetID ||
-                image.imageDescription ||
-                image.description ||
-                image.dateTimeOriginal
-            );
-
-
-        // Если метаданных нет,
-        // это изображение пока не подходит
-        // как representative.
-
-        if (!hasMetadata) {
-            continue;
-        }
-
-
-        // Если для этого SHA-256
-        // метаданные уже найдены,
-        // оставляем первый успешный результат.
-
-        if (!metadataBySha256.has(sha256)) {
-
-            metadataBySha256.set(
-                sha256,
-                image
-            );
+        if (!metadataBySha256.has(image.sha256)) {
+            metadataBySha256.set(image.sha256, image);
         }
     }
 
+    return duplicateGroups.map(group => {
+        let metadataImage = null;
 
-    // ======================================================
-    // Обогащаем группы.
-    // ======================================================
+        if (group.sha256) {
+            metadataImage = metadataBySha256.get(group.sha256) || null;
+        }
 
-    const enrichedGroups =
-        duplicateGroups.map(group => {
+        if (!metadataImage && Array.isArray(group.images)) {
+            for (const image of group.images) {
+                if (!image.sha256) {
+                    continue;
+                }
 
-            // ------------------------------------------------
-            // Для Exact-группы используем SHA-256 группы.
-            // ------------------------------------------------
+                const candidate = metadataBySha256.get(image.sha256);
 
-            let metadataImage = null;
-
-
-            if (group.sha256) {
-
-                metadataImage =
-                    metadataBySha256.get(
-                        group.sha256
-                    ) || null;
-            }
-
-
-            // ------------------------------------------------
-            // Для Similar-группы общего SHA-256 нет.
-            //
-            // Поэтому ищем metadata среди изображений
-            // самой группы.
-            // ------------------------------------------------
-
-            if (
-                !metadataImage &&
-                Array.isArray(group.images)
-            ) {
-
-                for (const image of group.images) {
-
-                    if (!image.sha256) {
-                        continue;
-                    }
-
-
-                    const candidate =
-                        metadataBySha256.get(
-                            image.sha256
-                        );
-
-
-                    if (candidate) {
-
-                        metadataImage =
-                            candidate;
-
-                        break;
-                    }
+                if (candidate) {
+                    metadataImage = candidate;
+                    break;
                 }
             }
+        }
 
-
-            // ------------------------------------------------
-            // Формируем результат.
-            // ------------------------------------------------
-
-            return {
-
-                ...group,
-
-
-                // ==================================================
-                // Metadata
-                // ==================================================
-                //
-                // Если metadata найдены,
-                // сохраняем изображение,
-                // от которого они получены.
-                //
-                // Если metadata нет,
-                // значение null.
-                //
-                metadata:
-                    metadataImage
-                        ? metadataImage
-                        : null,
-
-
-                // ==================================================
-                // Representative
-                // ==================================================
-                //
-                // Representative используется
-                // следующим этапом, например Reverse Search.
-                //
-                // Если metadata найдены,
-                // representative = изображение
-                // с успешно полученными metadata.
-                //
-                // Если metadata нет,
-                // representative = null.
-                //
-                representative:
-                    metadataImage
-                        ? metadataImage
-                        : null
-            };
-        });
-
-
-    // ======================================================
-    // Возвращаем обогащённые группы.
-    // ======================================================
-
-    return enrichedGroups;
+        return {
+            ...group,
+            metadata: metadataImage,
+            representative: metadataImage
+        };
+    });
 }
