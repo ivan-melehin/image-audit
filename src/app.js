@@ -84,7 +84,7 @@ const server = http.createServer(async (req, res) => {
       console.log(`\nЗапущен аудит: ${data.url}`);
       console.log(`Job ID: ${jobId}`);
 
-      // Запускаем аудит в фоне, не ожидая его завершения.
+      // Запускаем аудит в фоне.
       runAudit(data.url)
         .then(result => {
           jobs.set(jobId, {
@@ -124,6 +124,62 @@ const server = http.createServer(async (req, res) => {
 
       res.end(JSON.stringify({
         error: 'Некорректный запрос'
+      }));
+    }
+
+    return;
+  }
+
+  // Скачиваем Excel-отчёт.
+  if (req.method === 'GET' && req.url.startsWith('/api/audit/') && req.url.endsWith('/report')) {
+    const parts = req.url.split('/');
+    const jobId = parts[3];
+    const job = jobs.get(jobId);
+
+    if (!job) {
+      res.writeHead(404, {
+        'Content-Type': 'application/json; charset=utf-8'
+      });
+
+      res.end(JSON.stringify({
+        error: 'Аудит не найден'
+      }));
+
+      return;
+    }
+
+    if (job.status !== 'completed' || !job.result?.auditReportPath) {
+      res.writeHead(404, {
+        'Content-Type': 'application/json; charset=utf-8'
+      });
+
+      res.end(JSON.stringify({
+        error: 'Отчёт ещё не готов'
+      }));
+
+      return;
+    }
+
+    try {
+      const reportPath = job.result.auditReportPath;
+      const report = await fs.readFile(reportPath);
+
+      res.writeHead(200, {
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': 'attachment; filename="image-audit-report.xlsx"',
+        'Content-Length': report.length
+      });
+
+      res.end(report);
+    } catch (error) {
+      console.error('Ошибка загрузки отчёта:', error);
+
+      res.writeHead(500, {
+        'Content-Type': 'application/json; charset=utf-8'
+      });
+
+      res.end(JSON.stringify({
+        error: 'Не удалось загрузить отчёт'
       }));
     }
 

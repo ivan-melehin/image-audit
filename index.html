@@ -651,40 +651,20 @@
       }
 
       if (data.status === "completed") {
-        showAuditResult(data.result);
+        showAuditResult(data.result, jobId);
       }
     }
 
-    function showAuditResult(data) {
-      const button = document.querySelector(".audit-form button");
-      const statusTitle = document.getElementById("statusTitle");
-      const statusText = document.getElementById("statusText");
-      const result = document.getElementById("auditResult");
-      const imagesCount = document.getElementById("imagesCount");
-      const pagesCount = document.getElementById("pagesCount");
-      const elapsedTime = document.getElementById("elapsedTime");
-      const reportLink = document.getElementById("reportLink");
+function showAuditResult(data, jobId) {
+  resultSection.classList.add('visible');
 
-      const images = Array.isArray(data.images) ? data.images.length : 0;
-      const pages = Array.isArray(data.pages) ? data.pages.length : 0;
+  pagesCount.textContent = data.pages?.length || 0;
+  imagesCount.textContent = data.images?.length || 0;
+  uniqueCount.textContent = data.uniqueImages?.length || 0;
+  elapsedTime.textContent = data.elapsedTime || '—';
 
-      statusTitle.textContent = "Аудит завершён";
-      statusText.textContent = "Основные результаты проверки готовы.";
-      imagesCount.textContent = images;
-      pagesCount.textContent = pages;
-      elapsedTime.textContent = data.elapsedTime || "—";
-      result.classList.add("visible");
-
-      if (data.auditReportPath) {
-        reportLink.href = data.auditReportPath;
-        reportLink.style.display = "inline-block";
-      } else {
-        reportLink.style.display = "none";
-      }
-
-      button.disabled = false;
-      button.textContent = "Начать аудит →";
-    }
+  reportLink.href = `/api/audit/${jobId}/report`;
+}
 
     function openFeedback() {
       document.getElementById("feedbackDialog").showModal();
