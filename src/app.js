@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { runAudit } from './audit/runAudit.js';
 
-const PORT = 3000;
+const PORT = Number(process.env.PORT) || 3000;
 const jobs = new Map();
 
 // Определяем путь к корню проекта.
@@ -45,7 +45,10 @@ const server = http.createServer(async (req, res) => {
       'Content-Type': 'application/json; charset=utf-8'
     });
 
-    res.end(JSON.stringify({ status: 'ok' }));
+    res.end(JSON.stringify({
+      status: 'ok'
+    }));
+
     return;
   }
 
@@ -131,7 +134,11 @@ const server = http.createServer(async (req, res) => {
   }
 
   // Скачиваем Excel-отчёт.
-  if (req.method === 'GET' && req.url.startsWith('/api/audit/') && req.url.endsWith('/report')) {
+  if (
+    req.method === 'GET' &&
+    req.url.startsWith('/api/audit/') &&
+    req.url.endsWith('/report')
+  ) {
     const parts = req.url.split('/');
     const jobId = parts[3];
     const job = jobs.get(jobId);
@@ -148,7 +155,10 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    if (job.status !== 'completed' || !job.result?.auditReportPath) {
+    if (
+      job.status !== 'completed' ||
+      !job.result?.auditReportPath
+    ) {
       res.writeHead(404, {
         'Content-Type': 'application/json; charset=utf-8'
       });
@@ -187,7 +197,10 @@ const server = http.createServer(async (req, res) => {
   }
 
   // Получаем статус аудита.
-  if (req.method === 'GET' && req.url.startsWith('/api/audit/')) {
+  if (
+    req.method === 'GET' &&
+    req.url.startsWith('/api/audit/')
+  ) {
     const jobId = req.url.split('/').pop();
     const job = jobs.get(jobId);
 
@@ -208,6 +221,7 @@ const server = http.createServer(async (req, res) => {
     });
 
     res.end(JSON.stringify(job));
+
     return;
   }
 
@@ -221,7 +235,7 @@ const server = http.createServer(async (req, res) => {
   }));
 });
 
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log('\nImage Audit server запущен:');
   console.log(`http://localhost:${PORT}`);
 });

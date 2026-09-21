@@ -4,16 +4,17 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Image Audit</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%238b5cf6'/%3E%3Cpath d='M25 25h50v14H39v11h31v14H39v11h36v14H25z' fill='white'/%3E%3C/svg%3E">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='white'/%3E%3Cpath d='M25 25h50v14H39v11h31v14H39v11h36v14H25z' fill='black'/%3E%3C/svg%3E">
 
   <style>
     :root {
-      --background: #f5f7fa;
-      --text: #111827;
-      --muted: #64748b;
-      --line: #d8dee8;
-      --accent: #8b5cf6;
+      --background: #f5f5f5;
+      --text: #111111;
+      --muted: #666666;
+      --line: #d8d8d8;
       --white: #ffffff;
+      --black: #111111;
+      --light: #eeeeee;
     }
 
     * {
@@ -70,6 +71,7 @@
     .feedback-button {
       border: 1px solid var(--line);
       background: var(--white);
+      color: var(--text);
       padding: 10px 16px;
       border-radius: 999px;
       cursor: pointer;
@@ -78,7 +80,7 @@
 
     .github-link:hover,
     .feedback-button:hover {
-      border-color: var(--accent);
+      border-color: var(--black);
     }
 
     .hero {
@@ -88,7 +90,7 @@
 
     .eyebrow {
       margin: 0 0 22px;
-      color: var(--accent);
+      color: var(--black);
       font-size: 13px;
       font-weight: 800;
       letter-spacing: 0.14em;
@@ -102,7 +104,7 @@
     }
 
     h1 em {
-      color: var(--accent);
+      color: var(--black);
       font-style: normal;
     }
 
@@ -133,14 +135,14 @@
     }
 
     .audit-form input:focus {
-      border-color: var(--accent);
+      border-color: var(--black);
     }
 
     .audit-form button {
       border: 0;
       border-radius: 12px;
       padding: 18px 24px;
-      background: var(--accent);
+      background: var(--black);
       color: white;
       font-weight: 700;
       cursor: pointer;
@@ -148,7 +150,7 @@
     }
 
     .audit-form button:hover {
-      opacity: 0.9;
+      background: #333333;
     }
 
     .audit-form button:disabled {
@@ -166,7 +168,7 @@
     .status {
       display: none;
       margin-top: 28px;
-      padding: 20px;
+      padding: 24px;
       border: 1px solid var(--line);
       border-radius: 12px;
       background: var(--white);
@@ -174,6 +176,13 @@
 
     .status.visible {
       display: block;
+    }
+
+    .status-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
     }
 
     .status-title {
@@ -186,9 +195,104 @@
       font-size: 14px;
     }
 
+    .status-indicator {
+      width: 10px;
+      height: 10px;
+      flex: 0 0 auto;
+      border-radius: 50%;
+      background: var(--black);
+      animation: pulse 1.2s infinite;
+    }
+
+    .status-indicator.completed {
+      animation: none;
+      background: var(--black);
+    }
+
+    .status-indicator.error {
+      animation: none;
+      background: #888888;
+    }
+
+    @keyframes pulse {
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.25;
+      }
+    }
+
+    .progress {
+      position: relative;
+      overflow: hidden;
+      height: 5px;
+      margin-top: 22px;
+      border-radius: 999px;
+      background: var(--light);
+    }
+
+    .progress-bar {
+      position: absolute;
+      top: 0;
+      left: -35%;
+      width: 35%;
+      height: 100%;
+      border-radius: 999px;
+      background: var(--black);
+      animation: progress 1.4s infinite ease-in-out;
+    }
+
+    .progress.completed .progress-bar {
+      left: 0;
+      width: 100%;
+      animation: none;
+    }
+
+    @keyframes progress {
+      0% {
+        left: -35%;
+      }
+
+      100% {
+        left: 100%;
+      }
+    }
+
+    .audit-steps {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 8px;
+      margin-top: 24px;
+    }
+
+    .audit-step {
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      color: #999999;
+      font-size: 11px;
+      font-weight: 700;
+      text-align: center;
+      transition: 0.2s ease;
+    }
+
+    .audit-step.active {
+      border-color: var(--black);
+      background: var(--black);
+      color: var(--white);
+    }
+
+    .audit-step.completed {
+      border-color: var(--black);
+      color: var(--black);
+    }
+
     .result {
       display: none;
-      margin-top: 16px;
+      margin-top: 24px;
     }
 
     .result.visible {
@@ -227,9 +331,13 @@
       margin-top: 18px;
       padding: 12px 18px;
       border-radius: 10px;
-      background: var(--text);
+      background: var(--black);
       color: white;
       font-size: 14px;
+    }
+
+    .download-button:hover {
+      background: #333333;
     }
 
     section {
@@ -258,7 +366,7 @@
 
     .capability-number {
       margin-bottom: 50px;
-      color: var(--accent);
+      color: var(--black);
       font-size: 13px;
       font-weight: 800;
     }
@@ -290,7 +398,7 @@
     }
 
     .pipeline-number {
-      color: var(--accent);
+      color: var(--black);
       font-size: 12px;
       font-weight: 800;
     }
@@ -312,11 +420,11 @@
       border: 0;
       border-radius: 16px;
       padding: 30px;
-      box-shadow: 0 20px 60px rgba(15, 23, 42, 0.2);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
     }
 
     dialog::backdrop {
-      background: rgba(15, 23, 42, 0.45);
+      background: rgba(0, 0, 0, 0.45);
     }
 
     dialog h2 {
@@ -350,6 +458,10 @@
       .capabilities,
       .pipeline {
         grid-template-columns: 1fr 1fr;
+      }
+
+      .audit-steps {
+        grid-template-columns: 1fr;
       }
 
       .result-grid {
@@ -438,12 +550,44 @@
         </p>
 
         <div id="auditStatus" class="status">
-          <div id="statusTitle" class="status-title">
-            Аудит выполняется...
+          <div class="status-header">
+            <div>
+              <div id="statusTitle" class="status-title">
+                Аудит выполняется...
+              </div>
+
+              <div id="statusText" class="status-text">
+                Подготавливаем проверку сайта.
+              </div>
+            </div>
+
+            <div id="statusIndicator" class="status-indicator"></div>
           </div>
 
-          <div id="statusText" class="status-text">
-            Сканируем сайт и анализируем изображения.
+          <div id="progress" class="progress">
+            <div class="progress-bar"></div>
+          </div>
+
+          <div class="audit-steps">
+            <div id="step1" class="audit-step active">
+              01 СКАНИРОВАНИЕ
+            </div>
+
+            <div id="step2" class="audit-step">
+              02 ИЗОБРАЖЕНИЯ
+            </div>
+
+            <div id="step3" class="audit-step">
+              03 ПРОВЕРКА
+            </div>
+
+            <div id="step4" class="audit-step">
+              04 АНАЛИЗ
+            </div>
+
+            <div id="step5" class="audit-step">
+              05 ОТЧЁТ
+            </div>
           </div>
 
           <div id="auditResult" class="result">
@@ -581,6 +725,32 @@
   </dialog>
 
   <script>
+    let progressTimer = null;
+    let currentStep = 1;
+
+    const auditStages = [
+      {
+        title: "Сканируем сайт...",
+        text: "Находим страницы и ссылки."
+      },
+      {
+        title: "Собираем изображения...",
+        text: "Получаем изображения со страниц сайта."
+      },
+      {
+        title: "Проверяем изображения...",
+        text: "Проверяем доступность и параметры файлов."
+      },
+      {
+        title: "Анализируем изображения...",
+        text: "Считаем хеши, дубликаты, метаданные и риск."
+      },
+      {
+        title: "Формируем отчёт...",
+        text: "Собираем результаты аудита в Excel."
+      }
+    ];
+
     async function startAudit(event) {
       event.preventDefault();
 
@@ -590,6 +760,8 @@
       const statusTitle = document.getElementById("statusTitle");
       const statusText = document.getElementById("statusText");
       const result = document.getElementById("auditResult");
+      const indicator = document.getElementById("statusIndicator");
+      const progress = document.getElementById("progress");
       const originalText = button.textContent;
       const url = urlInput.value.trim();
 
@@ -598,11 +770,17 @@
       }
 
       button.disabled = true;
-      button.textContent = "Запуск...";
+      button.textContent = "Аудит выполняется...";
       status.classList.add("visible");
       result.classList.remove("visible");
-      statusTitle.textContent = "Аудит запускается...";
-      statusText.textContent = "Подготавливаем проверку сайта.";
+      indicator.className = "status-indicator";
+      progress.className = "progress";
+      currentStep = 1;
+      updateAuditStep();
+      startProgressAnimation();
+
+      statusTitle.textContent = auditStages[0].title;
+      statusText.textContent = auditStages[0].text;
 
       try {
         const response = await fetch("/api/audit", {
@@ -619,15 +797,15 @@
           throw new Error(data.error || "Не удалось запустить аудит.");
         }
 
-        statusTitle.textContent = "Аудит выполняется...";
-        statusText.textContent = "Сканируем сайт и анализируем изображения.";
-        button.textContent = "Аудит выполняется...";
-
         await checkAuditStatus(data.jobId);
       } catch (error) {
         console.error(error);
+        stopProgressAnimation();
+
         statusTitle.textContent = "Ошибка";
         statusText.textContent = error.message;
+        indicator.className = "status-indicator error";
+        progress.className = "progress";
         button.disabled = false;
         button.textContent = originalText;
       }
@@ -642,6 +820,7 @@
       }
 
       if (data.status === "running") {
+        updateProgressStage();
         setTimeout(() => checkAuditStatus(jobId), 2000);
         return;
       }
@@ -655,16 +834,94 @@
       }
     }
 
-function showAuditResult(data, jobId) {
-  resultSection.classList.add('visible');
+    function startProgressAnimation() {
+      stopProgressAnimation();
 
-  pagesCount.textContent = data.pages?.length || 0;
-  imagesCount.textContent = data.images?.length || 0;
-  uniqueCount.textContent = data.uniqueImages?.length || 0;
-  elapsedTime.textContent = data.elapsedTime || '—';
+      progressTimer = setInterval(() => {
+        currentStep++;
 
-  reportLink.href = `/api/audit/${jobId}/report`;
-}
+        if (currentStep > 5) {
+          currentStep = 1;
+        }
+
+        updateAuditStep();
+      }, 5000);
+    }
+
+    function stopProgressAnimation() {
+      if (progressTimer) {
+        clearInterval(progressTimer);
+        progressTimer = null;
+      }
+    }
+
+    function updateProgressStage() {
+      const stage = auditStages[currentStep - 1];
+
+      document.getElementById("statusTitle").textContent = stage.title;
+      document.getElementById("statusText").textContent = stage.text;
+      updateAuditStep();
+    }
+
+    function updateAuditStep() {
+      for (let index = 1; index <= 5; index++) {
+        const step = document.getElementById(`step${index}`);
+
+        step.classList.remove("active", "completed");
+
+        if (index < currentStep) {
+          step.classList.add("completed");
+        }
+
+        if (index === currentStep) {
+          step.classList.add("active");
+        }
+      }
+
+      const stage = auditStages[currentStep - 1];
+
+      document.getElementById("statusTitle").textContent = stage.title;
+      document.getElementById("statusText").textContent = stage.text;
+    }
+
+    function showAuditResult(data, jobId) {
+      stopProgressAnimation();
+
+      const resultSection = document.getElementById("auditResult");
+      const statusTitle = document.getElementById("statusTitle");
+      const statusText = document.getElementById("statusText");
+      const pagesCount = document.getElementById("pagesCount");
+      const imagesCount = document.getElementById("imagesCount");
+      const elapsedTime = document.getElementById("elapsedTime");
+      const reportLink = document.getElementById("reportLink");
+      const indicator = document.getElementById("statusIndicator");
+      const progress = document.getElementById("progress");
+      const button = document.querySelector(".audit-form button");
+
+      statusTitle.textContent = "Аудит завершён";
+      statusText.textContent = "Результаты проверки готовы.";
+
+      pagesCount.textContent = data.pages?.length || 0;
+      imagesCount.textContent = data.images?.length || 0;
+      elapsedTime.textContent = data.elapsedTime || "—";
+
+      reportLink.href = `/api/audit/${jobId}/report`;
+
+      currentStep = 5;
+      updateAuditStep();
+
+      for (let index = 1; index <= 5; index++) {
+        document.getElementById(`step${index}`).classList.remove("active");
+        document.getElementById(`step${index}`).classList.add("completed");
+      }
+
+      indicator.className = "status-indicator completed";
+      progress.className = "progress completed";
+      resultSection.classList.add("visible");
+
+      button.disabled = false;
+      button.textContent = "Начать новый аудит →";
+    }
 
     function openFeedback() {
       document.getElementById("feedbackDialog").showModal();
