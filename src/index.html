@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Image Audit</title>
+
+  <!-- Favicon -->
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%238b5cf6'/%3E%3Cpath d='M25 25h50v14H39v11h31v14H39v11h36v14H25z' fill='white'/%3E%3C/svg%3E">
+
+  <style>
+    :root {
+      --background: #f5f7fa;
+      --text: #111827;
+      --muted: #64748b;
+      --line: #d8dee8;
+      --accent: #8b5cf6;
+      --white: #ffffff;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      background: var(--background);
+      color: var(--text);
+      font-family: Arial, Helvetica, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    button,
+    input,
+    textarea {
+      font: inherit;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    /* Header */
+    .header {
+      height: 78px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 4vw;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .logo {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -1px;
+    }
+
+    .logo span {
+      font-weight: 400;
+    }
+
+    .navigation {
+      display: flex;
+      align-items: center;
+      gap: 28px;
+    }
+
+    .navigation a,
+    .navigation button {
+      border: 0;
+      background: transparent;
+      color: var(--text);
+      font-size: 14px;
+    }
+
+    .navigation a:hover,
+    .navigation button:hover {
+      opacity: 0.55;
+    }
+
+    /* Hero */
+    .hero {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 9vw 4vw 8vw;
+    }
+
+    .eyebrow {
+      margin: 0 0 25px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 2px;
+    }
+
+    .hero h1 {
+      max-width: 1050px;
+      margin: 0;
+      font-size: clamp(60px, 9vw, 140px);
+      line-height: 0.84;
+      letter-spacing: -7px;
+      font-weight: 600;
+    }
+
+    .hero h1 em {
+      color: transparent;
+      font-style: normal;
+      -webkit-text-stroke: 1.5px var(--text);
+    }
+
+    .lead {
+      max-width: 560px;
+      margin: 48px 0 42px;
+      color: var(--muted);
+      font-size: 20px;
+      line-height: 1.45;
+    }
+
+    /* URL form */
+    .audit-form {
+      max-width: 950px;
+    }
+
+    .audit-form label {
+      display: block;
+      margin-bottom: 9px;
+      font-size: 13px;
+    }
+
+    .url-row {
+      display: flex;
+      background: var(--white);
+      border: 1px solid var(--text);
+    }
+
+    .url-row input {
+      flex: 1;
+      min-width: 0;
+      padding: 20px 22px;
+      border: 0;
+      outline: none;
+      background: transparent;
+      color: var(--text);
+      font-size: 18px;
+    }
+
+    .url-row input::placeholder {
+      color: #94a3b8;
+    }
+
+    .url-row button {
+      padding: 0 28px;
+      border: 0;
+      background: var(--text);
+      color: var(--white);
+      font-weight: 700;
+    }
+
+    .url-row button span {
+      margin-left: 25px;
+      font-size: 20px;
+    }
+
+    .url-row button:hover {
+      background: var(--accent);
+      color: var(--white);
+    }
+
+    /* Development warning */
+    .development-warning {
+      max-width: 950px;
+      margin-top: 22px;
+      padding: 16px 0;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .development-warning strong {
+      color: var(--text);
+    }
+
+    /* Capabilities */
+    .capabilities {
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .capabilities-inner {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 0 4vw;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+    }
+
+    .capability {
+      min-height: 170px;
+      padding: 30px 20px 30px 0;
+      border-right: 1px solid var(--line);
+    }
+
+    .capability:not(:first-child) {
+      padding-left: 25px;
+    }
+
+    .capability:last-child {
+      border-right: 0;
+    }
+
+    .capability-number {
+      margin-bottom: 35px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .capability-title {
+      margin-bottom: 8px;
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .capability-description {
+      max-width: 200px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    /* How it works */
+    .how-it-works {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 110px 4vw;
+    }
+
+    .section-label {
+      margin-bottom: 60px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 2px;
+    }
+
+    .how-it-works h2 {
+      max-width: 850px;
+      margin: 0;
+      font-size: clamp(45px, 6vw, 80px);
+      line-height: 0.9;
+      letter-spacing: -4px;
+      font-weight: 500;
+    }
+
+    .pipeline {
+      display: flex;
+      margin-top: 70px;
+      border-top: 1px solid var(--text);
+      border-bottom: 1px solid var(--text);
+    }
+
+    .pipeline-step {
+      flex: 1;
+      min-height: 120px;
+      padding: 20px;
+      border-right: 1px solid var(--line);
+    }
+
+    .pipeline-step:last-child {
+      border-right: 0;
+    }
+
+    .pipeline-number {
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .pipeline-name {
+      margin-top: 25px;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    /* Footer */
+    footer {
+      padding: 25px 4vw;
+      border-top: 1px solid var(--line);
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1px;
+    }
+
+    /* Feedback modal */
+    dialog {
+      width: min(560px, 90%);
+      padding: 0;
+      border: 0;
+      background: transparent;
+    }
+
+    dialog::backdrop {
+      background: rgba(15, 23, 42, 0.45);
+    }
+
+    .feedback-modal {
+      position: relative;
+      padding: 42px;
+      background: var(--background);
+    }
+
+    .feedback-modal h2 {
+      margin: 0 0 30px;
+      font-size: 45px;
+      line-height: 0.95;
+      letter-spacing: -3px;
+      font-weight: 500;
+    }
+
+    .feedback-modal textarea,
+    .feedback-modal input {
+      width: 100%;
+      margin-bottom: 12px;
+      padding: 15px;
+      border: 1px solid var(--line);
+      background: var(--white);
+      outline: none;
+    }
+
+    .feedback-modal textarea {
+      height: 140px;
+      resize: vertical;
+    }
+
+    .feedback-submit {
+      padding: 15px 22px;
+      border: 0;
+      background: var(--text);
+      color: var(--white);
+      font-weight: 700;
+    }
+
+    .feedback-submit:hover {
+      background: var(--accent);
+    }
+
+    .feedback-close {
+      position: absolute;
+      top: 15px;
+      right: 20px;
+      border: 0;
+      background: transparent;
+      font-size: 30px;
+    }
+
+    /* Mobile */
+    @media (max-width: 700px) {
+      .header {
+        padding: 0 20px;
+      }
+
+      .navigation {
+        gap: 14px;
+      }
+
+      .hero {
+        padding: 70px 20px;
+      }
+
+      .hero h1 {
+        font-size: 58px;
+        letter-spacing: -4px;
+      }
+
+      .lead {
+        font-size: 17px;
+      }
+
+      .url-row {
+        display: block;
+      }
+
+      .url-row input {
+        width: 100%;
+        padding: 18px;
+      }
+
+      .url-row button {
+        width: 100%;
+        padding: 17px;
+      }
+
+      .capabilities-inner {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .capability {
+        border-bottom: 1px solid var(--line);
+      }
+
+      .pipeline {
+        display: block;
+      }
+
+      .pipeline-step {
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .pipeline-step:last-child {
+        border-bottom: 0;
+      }
+
+      .how-it-works {
+        padding: 80px 20px;
+      }
+
+      footer {
+        padding: 25px 20px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- Header -->
+  <header class="header">
+    <a href="/" class="logo">IMAGE<span>AUDIT</span></a>
+
+    <nav class="navigation">
+      <a href="https://github.com/ivan-melehin/image-audit" target="_blank">GitHub ↗</a>
+      <button onclick="openFeedback()">Обратная связь</button>
+    </nav>
+  </header>
+
+  <main>
+
+    <!-- Hero -->
+    <section class="hero">
+      <p class="eyebrow">IMAGE RISK AUDIT</p>
+
+      <h1>
+        Проверьте<br>
+        <em>изображения</em><br>
+        своего сайта.
+      </h1>
+
+      <p class="lead">
+        Найдите изображения, дубликаты и метаданные,
+        которые требуют дополнительной проверки на нарушение авторских прав.
+      </p>
+
+      <!-- URL form -->
+      <form class="audit-form" onsubmit="startAudit(event)">
+        <label for="website-url">URL сайта</label>
+
+        <div class="url-row">
+          <input
+            id="website-url"
+            type="url"
+            placeholder="https://example.com"
+            required
+          >
+
+          <button type="submit">
+            Начать аудит <span>→</span>
+          </button>
+        </div>
+      </form>
+
+      <!-- Warning -->
+      <div class="development-warning">
+        <strong>⚠ Сервис находится на стадии разработки.</strong><br>
+        Результаты могут быть неполными.
+        Аудит не определяет факт нарушения авторских прав.
+      </div>
+    </section>
+
+    <!-- Capabilities -->
+    <section class="capabilities">
+      <div class="capabilities-inner">
+
+        <div class="capability">
+          <div class="capability-number">01</div>
+          <div class="capability-title">Сканирование</div>
+          <div class="capability-description">
+            Поиск страниц и изображений сайта.
+          </div>
+        </div>
+
+        <div class="capability">
+          <div class="capability-number">02</div>
+          <div class="capability-title">Дубликаты</div>
+          <div class="capability-description">
+            Поиск одинаковых и похожих изображений.
+          </div>
+        </div>
+
+        <div class="capability">
+          <div class="capability-number">03</div>
+          <div class="capability-title">Metadata</div>
+          <div class="capability-description">
+            Анализ технических метаданных файлов.
+          </div>
+        </div>
+
+        <div class="capability">
+          <div class="capability-number">04</div>
+          <div class="capability-title">Risk</div>
+          <div class="capability-description">
+            Формирование предварительной оценки риска.
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- How it works -->
+    <section class="how-it-works">
+      <div class="section-label">HOW IT WORKS</div>
+
+      <h2>
+        От URL сайта<br>
+        до Excel-отчёта.
+      </h2>
+
+      <div class="pipeline">
+
+        <div class="pipeline-step">
+          <div class="pipeline-number">01</div>
+          <div class="pipeline-name">CRAWL</div>
+        </div>
+
+        <div class="pipeline-step">
+          <div class="pipeline-number">02</div>
+          <div class="pipeline-name">COLLECT</div>
+        </div>
+
+        <div class="pipeline-step">
+          <div class="pipeline-number">03</div>
+          <div class="pipeline-name">CHECK</div>
+        </div>
+
+        <div class="pipeline-step">
+          <div class="pipeline-number">04</div>
+          <div class="pipeline-name">HASH</div>
+        </div>
+
+        <div class="pipeline-step">
+          <div class="pipeline-number">05</div>
+          <div class="pipeline-name">MATCH</div>
+        </div>
+
+        <div class="pipeline-step">
+          <div class="pipeline-number">06</div>
+          <div class="pipeline-name">RISK</div>
+        </div>
+
+        <div class="pipeline-step">
+          <div class="pipeline-number">07</div>
+          <div class="pipeline-name">EXCEL</div>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer>
+    <span>IMAGE AUDIT</span>
+    <span>Find. Analyze. Understand.</span>
+  </footer>
+
+  <!-- Feedback modal -->
+  <dialog id="feedbackDialog">
+    <div class="feedback-modal">
+
+      <button class="feedback-close" onclick="closeFeedback()">
+        ×
+      </button>
+
+      <p class="eyebrow">FEEDBACK</p>
+
+      <h2>
+        Что можно улучшить?
+      </h2>
+
+      <textarea placeholder="Ваше сообщение"></textarea>
+
+      <input
+        type="email"
+        placeholder="Email (необязательно)"
+      >
+
+      <button class="feedback-submit">
+        Отправить →
+      </button>
+
+    </div>
+  </dialog>
+
+  <!-- Temporary JS -->
+  <script>
+    function startAudit(event) {
+      event.preventDefault();
+
+      const url = document.getElementById("website-url").value;
+
+      alert(
+        "URL получен:\n\n" +
+        url +
+        "\n\nСледующим этапом подключим настоящий аудит."
+      );
+    }
+
+    function openFeedback() {
+      document.getElementById("feedbackDialog").showModal();
+    }
+
+    function closeFeedback() {
+      document.getElementById("feedbackDialog").close();
+    }
+  </script>
+
+</body>
+</html>
