@@ -429,36 +429,109 @@
       font-size: 13px;
     }
 
-    dialog {
-      width: min(500px, calc(100% - 40px));
-      border: 0;
-      border-radius: 16px;
-      padding: 30px;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
-    }
+dialog {
+  position: relative;
+  width: min(500px, calc(100% - 40px));
+  border: 0;
+  border-radius: 16px;
+  padding: 30px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+}
 
-    dialog::backdrop {
-      background: rgba(0, 0, 0, 0.45);
-    }
+dialog::backdrop {
+  background: rgba(0, 0, 0, 0.45);
+}
 
-    dialog h2 {
-      margin-top: 0;
-    }
+dialog h2 {
+  margin: 0 40px 10px 0;
+  font-size: 28px;
+}
 
-    .dialog-actions {
-      display: flex;
-      justify-content: flex-end;
-      gap: 10px;
-      margin-top: 20px;
-    }
+.feedback-description {
+  margin: 0 0 24px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
 
-    .dialog-actions button {
-      border: 1px solid var(--line);
-      border-radius: 10px;
-      padding: 10px 16px;
-      background: var(--white);
-      cursor: pointer;
-    }
+.dialog-close {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--white);
+  color: var(--text);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.dialog-close:hover {
+  border-color: var(--black);
+}
+
+#feedbackForm {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+#feedbackForm label {
+  margin-top: 10px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+#feedbackForm input,
+#feedbackForm textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: var(--white);
+  color: var(--text);
+  outline: none;
+  resize: vertical;
+}
+
+#feedbackForm input:focus,
+#feedbackForm textarea:focus {
+  border-color: var(--black);
+}
+
+.feedback-submit {
+  margin-top: 14px;
+  border: 0;
+  border-radius: 10px;
+  padding: 13px 18px;
+  background: var(--black);
+  color: var(--white);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.feedback-submit:hover {
+  background: #333333;
+}
+
+.feedback-submit:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.feedback-status {
+  display: none;
+  margin-top: 12px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.feedback-status.visible {
+  display: block;
+}
 
     @media (max-width: 800px) {
       .hero {
@@ -723,20 +796,56 @@
     </footer>
   </div>
 
-  <dialog id="feedbackDialog">
-    <h2>Обратная связь</h2>
+ <dialog id="feedbackDialog">
+  <button class="dialog-close" type="button" onclick="closeFeedback()" aria-label="Закрыть">
+    ×
+  </button>
 
-    <p>
-      Здесь позже появится форма для отправки предложений,
-      ошибок и замечаний по работе сервиса.
-    </p>
+  <h2>Обратная связь</h2>
 
-    <div class="dialog-actions">
-      <button type="button" onclick="closeFeedback()">
-        Закрыть
-      </button>
-    </div>
-  </dialog>
+  <p class="feedback-description">
+    Предложения, ошибки и замечания по работе сервиса.
+  </p>
+
+  <form
+    id="feedbackForm"
+    action="https://formspree.io/f/xrpbgyyn"
+    method="POST"
+  >
+    <label for="feedbackName">Имя</label>
+    <input
+      id="feedbackName"
+      name="name"
+      type="text"
+      placeholder="Ваше имя"
+      required
+    >
+
+    <label for="feedbackEmail">Email</label>
+    <input
+      id="feedbackEmail"
+      name="email"
+      type="email"
+      placeholder="your@email.com"
+      required
+    >
+
+    <label for="feedbackMessage">Сообщение</label>
+    <textarea
+      id="feedbackMessage"
+      name="message"
+      rows="5"
+      placeholder="Ваше сообщение"
+      required
+    ></textarea>
+
+    <button class="feedback-submit" type="submit">
+      Отправить →
+    </button>
+
+    <div id="feedbackStatus" class="feedback-status"></div>
+  </form>
+</dialog>
 
   <script>
     let progressTimer = null;
@@ -944,6 +1053,45 @@
     function closeFeedback() {
       document.getElementById("feedbackDialog").close();
     }
+
+    const feedbackForm = document.getElementById("feedbackForm");
+const feedbackStatus = document.getElementById("feedbackStatus");
+
+feedbackForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+
+  const submitButton = feedbackForm.querySelector(".feedback-submit");
+  const originalText = submitButton.textContent;
+
+  submitButton.disabled = true;
+  submitButton.textContent = "Отправка...";
+  feedbackStatus.classList.remove("visible");
+
+  try {
+    const response = await fetch(feedbackForm.action, {
+      method: "POST",
+      body: new FormData(feedbackForm),
+      headers: {
+        Accept: "application/json"
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error("Не удалось отправить сообщение.");
+    }
+
+    feedbackForm.reset();
+    feedbackStatus.textContent = "Спасибо! Сообщение отправлено.";
+    feedbackStatus.classList.add("visible");
+    submitButton.textContent = "Отправлено";
+  } catch (error) {
+    feedbackStatus.textContent = "Ошибка отправки. Попробуйте ещё раз.";
+    feedbackStatus.classList.add("visible");
+    submitButton.disabled = false;
+    submitButton.textContent = originalText;
+  }
+});
+
   </script>
 </body>
 </html>
