@@ -239,3 +239,5 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log('\nImage Audit server запущен:');
   console.log(`http://localhost:${PORT}`);
 });
+
+// npm install
