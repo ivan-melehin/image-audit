@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
+import { crawl } from './crawler/crawler.js';
 import { runAudit } from './audit/runAudit.js';
 
 const PORT = Number(process.env.PORT) || 3000;
@@ -52,7 +53,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Запускаем новый аудит.
+  // Запускаем предварительное сканирование сайта.
   if (req.method === 'POST' && req.url === '/api/audit') {
     try {
       let body = '';
@@ -75,40 +76,31 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
+      console.log(`\nСканирование сайта: ${data.url}`);
+
+      // Сначала только определяем количество страниц.
+      const pages = await crawl(data.url);
+
+      // Оцениваем время полного аудита.
+      const estimatedSeconds = Math.max(
+        30,
+        pages.length * 30
+      );
+
       const jobId = randomUUID();
 
       jobs.set(jobId, {
-        status: 'running',
+        status: 'awaiting_confirmation',
         url: data.url,
+        pages,
+        estimatedSeconds,
         result: null,
         error: null
       });
 
-      console.log(`\nЗапущен аудит: ${data.url}`);
+      console.log(`Найдено страниц: ${pages.length}`);
       console.log(`Job ID: ${jobId}`);
-
-      // Запускаем аудит в фоне.
-      runAudit(data.url)
-        .then(result => {
-          jobs.set(jobId, {
-            status: 'completed',
-            url: data.url,
-            result,
-            error: null
-          });
-
-          console.log(`Аудит завершён: ${jobId}`);
-        })
-        .catch(error => {
-          jobs.set(jobId, {
-            status: 'failed',
-            url: data.url,
-            result: null,
-            error: error.message
-          });
-
-          console.error(`Ошибка аудита ${jobId}:`, error);
-        });
+      console.log('Ожидается подтверждение пользователя.');
 
       res.writeHead(202, {
         'Content-Type': 'application/json; charset=utf-8'
@@ -116,7 +108,9 @@ const server = http.createServer(async (req, res) => {
 
       res.end(JSON.stringify({
         jobId,
-        status: 'running'
+        status: 'awaiting_confirmation',
+        pagesCount: pages.length,
+        estimatedSeconds
       }));
     } catch (error) {
       console.error(error);
@@ -126,9 +120,122 @@ const server = http.createServer(async (req, res) => {
       });
 
       res.end(JSON.stringify({
-        error: 'Некорректный запрос'
+        error: error.message || 'Не удалось просканировать сайт'
       }));
     }
+
+    return;
+  }
+
+  // Продолжаем полный аудит после подтверждения пользователя.
+  if (
+    req.method === 'POST' &&
+    req.url.startsWith('/api/audit/') &&
+    req.url.endsWith('/continue')
+  ) {
+    const parts = req.url.split('/');
+    const jobId = parts[3];
+    const job = jobs.get(jobId);
+
+    if (!job) {
+      res.writeHead(404, {
+        'Content-Type': 'application/json; charset=utf-8'
+      });
+
+      res.end(JSON.stringify({
+        error: 'Аудит не найден'
+      }));
+
+      return;
+    }
+
+    if (job.status !== 'awaiting_confirmation') {
+      res.writeHead(400, {
+        'Content-Type': 'application/json; charset=utf-8'
+      });
+
+      res.end(JSON.stringify({
+        error: 'Этот аудит уже запущен или завершён'
+      }));
+
+      return;
+    }
+
+    job.status = 'running';
+
+    jobs.set(jobId, job);
+
+    console.log(`\nПродолжаем аудит: ${job.url}`);
+    console.log(`Job ID: ${jobId}`);
+
+    // Продолжаем аудит уже найденных страниц.
+    runAudit(job.url, job.pages)
+      .then(result => {
+        jobs.set(jobId, {
+          ...job,
+          status: 'completed',
+          result,
+          error: null
+        });
+
+        console.log(`Аудит завершён: ${jobId}`);
+      })
+      .catch(error => {
+        jobs.set(jobId, {
+          ...job,
+          status: 'failed',
+          result: null,
+          error: error.message
+        });
+
+        console.error(`Ошибка аудита ${jobId}:`, error);
+      });
+
+    res.writeHead(202, {
+      'Content-Type': 'application/json; charset=utf-8'
+    });
+
+    res.end(JSON.stringify({
+      jobId,
+      status: 'running'
+    }));
+
+    return;
+  }
+
+  // Завершаем аудит без запуска полного анализа.
+  if (
+    req.method === 'POST' &&
+    req.url.startsWith('/api/audit/') &&
+    req.url.endsWith('/cancel')
+  ) {
+    const parts = req.url.split('/');
+    const jobId = parts[3];
+    const job = jobs.get(jobId);
+
+    if (!job) {
+      res.writeHead(404, {
+        'Content-Type': 'application/json; charset=utf-8'
+      });
+
+      res.end(JSON.stringify({
+        error: 'Аудит не найден'
+      }));
+
+      return;
+    }
+
+    jobs.delete(jobId);
+
+    console.log(`Аудит завершён пользователем: ${jobId}`);
+
+    res.writeHead(200, {
+      'Content-Type': 'application/json; charset=utf-8'
+    });
+
+    res.end(JSON.stringify({
+      status: 'cancelled'
+    }));
 
     return;
   }

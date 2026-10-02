@@ -65,7 +65,7 @@ import { createAuditReport } from '../reports/auditReport.js';
 
 // Адрес сайта для аудита.
 
-export async function runAudit(startUrl) {
+export async function runAudit(startUrl, existingPages = null) {
 
 // Другие варианты:
 // https://ivanmelekhin.ru/
@@ -111,7 +111,7 @@ console.log('\n[1/8] Сканирование сайта...');
 
 
 const pages =
-    await crawl(startUrl);
+    existingPages || await crawl(startUrl);
 
 
 console.log(
